@@ -1,0 +1,97 @@
+SƠ ĐỒ THIẾT KẾ HỆ THỐNG (BẢN CẬP NHẬT)
+Cập nhật theo backend mới nhất: đăng ký/đăng nhập bằng Email hoặc Số điện thoại, chức năng Quên mật khẩu (Email/SMS), cùng 3 chức năng AI. Tên bảng/thành phần kỹ thuật giữ tiếng Anh (khớp mã nguồn), mô tả nghiệp vụ dùng tiếng Việt.
+CHƯƠNG 2 — MỤC 2.4: THIẾT KẾ HỆ THỐNG
+2.4.1. Kiến trúc tổng thể hệ thống
+Kiến trúc 3 lớp: Frontend (React/Vue/HTML) → Backend FastAPI (Auth Module JWT+RBAC, API Routers, AI Service Layer) → CSDL quan hệ. Đã bổ sung Notification Adapter dùng chung cho luồng Quên mật khẩu, gửi qua Email (SMTP) hoặc SMS (Twilio), có cơ chế dự phòng (Console Fallback) khi chưa cấu hình, giống triết lý fallback của AI Provider Adapter.
+Hình 2.4.1: Kiến trúc tổng thể hệ thống
+2.4.2. Thiết kế cơ sở dữ liệu (ERD)
+Bảng Users cập nhật: email và phone_number đều là NULLABLE + UNIQUE — cho phép đăng ký bằng 1 trong 2 hoặc cả 2; bổ sung các trường thông tin cá nhân (avatar_url, gender, date_of_birth, address, bio, job_title) và các trường chống brute-force (failed_login_attempts, locked_until). Bổ sung thêm bảng REVOKED_TOKENS để lưu vết token đã bị thu hồi khi đăng xuất.
+Hình 2.4.2: Sơ đồ thực thể quan hệ (ERD)
+2.4.3. Sơ đồ Use Case
+Gồm 5 nhóm chức năng: (3.1) Xác thực & bảo mật tài khoản — bổ sung Đổi mật khẩu, Đăng xuất; (3.2) Hồ sơ cá nhân — Xem/sửa thông tin, Avatar, Kỹ năng; (3.3) Quản trị hệ thống — chỉ Admin, tạo/sửa/xoá tài khoản, sửa vai trò thành viên; (3.4) Quản lý cốt lõi; (3.5) Chức năng AI.
+Hình 2.4.3: Sơ đồ Use Case tổng thể
+2.4.4. Sơ đồ trạng thái (State Diagram) — Vòng đời nhiệm vụ (Task)
+Mô tả các trạng thái của một nhiệm vụ và điều kiện chuyển trạng thái tương ứng với API PATCH /api/tasks/{id}. Lưu ý quan trọng: backend hiện KHÔNG ràng buộc thứ tự chuyển đổi — cho phép chuyển tự do giữa mọi trạng thái, khớp với cơ chế kéo-thả tự do trên Kanban Board.
+Hình 2.4.4: Sơ đồ trạng thái — Vòng đời nhiệm vụ (Task)
+2.4.5. Sơ đồ lớp (Class Diagram)
+Thể hiện thiết kế hướng đối tượng của các thành phần AI Provider Adapter, Email Service và SMS Service — cả 3 đều áp dụng mẫu thiết kế Strategy Pattern: định nghĩa 1 lớp trừu tượng (abstract) với phương thức chung, các lớp con cài đặt logic riêng cho từng nhà cung cấp, giúp dễ dàng thêm/thay nhà cung cấp mới mà không sửa code nghiệp vụ (Open/Closed Principle).
+Hình 2.4.5: Sơ đồ lớp — AI Provider / Email Sender / SMS Sender (Strategy Pattern)
+2.4.6. Sơ đồ thành phần (Component Diagram)
+Thể hiện các module phần mềm (component) trong backend và quan hệ phụ thuộc giữa chúng — góc nhìn ở mức module/file, chi tiết hơn sơ đồ kiến trúc tổng thể (vốn chỉ dừng ở mức tầng/layer). Đã bổ sung Rate Limiter Component (chống brute-force) nằm giữa Auth Component và API Routers.
+Hình 2.4.6: Sơ đồ thành phần (Component Diagram)
+2.4.7. Sơ đồ triển khai (Deployment Diagram)
+Thể hiện cách hệ thống được triển khai trên các node vật lý/môi trường thực thi: máy khách chạy trình duyệt, máy chủ ứng dụng chạy Uvicorn + FastAPI, máy chủ CSDL, và các dịch vụ đám mây bên ngoài (AI Engine, SMTP, Twilio) — sử dụng đúng ký hiệu UML «device», «execution environment», «artifact».
+Hình 2.4.7: Sơ đồ triển khai (Deployment Diagram)
+2.4.8. Phác thảo giao diện (UI Wireframe)
+Do dự án chưa xây dựng frontend hoàn chỉnh, các phác thảo dưới đây (mức độ low-fidelity — chỉ thể hiện bố cục và thành phần, chưa đi vào màu sắc/thiết kế chi tiết) minh hoạ 4 màn hình chính, giúp hình dung luồng sử dụng trước khi lập trình giao diện thật.
+Hình 2.4.8a: Wireframe — Màn hình Đăng nhập / Đăng ký
+Hình 2.4.8b: Wireframe — Màn hình Dashboard
+Hình 2.4.8c: Wireframe — Bảng Kanban
+Hình 2.4.8d: Wireframe — AI Hub (Gợi ý phân công)
+Hình 2.4.8e: Wireframe — Hồ sơ cá nhân (Profile)
+Hình 2.4.8f: Wireframe — Admin quản trị tài khoản
+CHƯƠNG 3 — SƠ ĐỒ HOẠT ĐỘNG & TUẦN TỰ
+3.1. Sơ đồ hoạt động (Activity Diagram)
+Sơ đồ 1 — Luồng Đăng ký (bằng Email hoặc SĐT) và Đăng nhập (tự nhận diện identifier):
+Hình 3.1a: Sơ đồ hoạt động — Đăng ký & Đăng nhập
+Sơ đồ 2 — Luồng Quên mật khẩu / Đặt lại mật khẩu, rẽ nhánh gửi qua Email hoặc SMS:
+Hình 3.1b: Sơ đồ hoạt động — Quên mật khẩu
+Sơ đồ 3 — Quản lý dự án & thành viên (tạo dự án, mời/thêm thành viên):
+Hình 3.1c: Sơ đồ hoạt động — Quản lý dự án & thành viên
+Sơ đồ 4 — Quản lý nhiệm vụ & Bảng Kanban (tạo nhiệm vụ, kéo-thả đổi trạng thái):
+Hình 3.1d: Sơ đồ hoạt động — Quản lý nhiệm vụ & Kanban
+Sơ đồ 5 — Quản lý Sprint (tạo, cập nhật trạng thái, xoá):
+Hình 3.1e: Sơ đồ hoạt động — Quản lý Sprint
+Sơ đồ 6 — Bình luận & đính kèm tài liệu theo nhiệm vụ:
+Hình 3.1f: Sơ đồ hoạt động — Bình luận & tài liệu
+Sơ đồ 7 — Tra cứu nhiệm vụ theo người / trạng thái / hạn hoàn thành:
+Hình 3.1g: Sơ đồ hoạt động — Tra cứu nhiệm vụ
+Sơ đồ 8 — Thống kê nhiệm vụ trễ hạn & tải công việc thành viên:
+Hình 3.1h: Sơ đồ hoạt động — Thống kê
+Sơ đồ 9 — Luồng AI gợi ý phân công nhiệm vụ theo kỹ năng và tải công việc:
+Hình 3.1i: Sơ đồ hoạt động — AI gợi ý phân công nhiệm vụ
+Sơ đồ 10 — Đổi mật khẩu khi đã đăng nhập:
+Hình 3.1j: Sơ đồ hoạt động — Đổi mật khẩu
+Sơ đồ 11 — Đăng xuất (thu hồi token):
+Hình 3.1k: Sơ đồ hoạt động — Đăng xuất
+Sơ đồ 12 — Tự sửa thông tin cá nhân & Avatar:
+Hình 3.1l: Sơ đồ hoạt động — Tự sửa Profile & Avatar
+Sơ đồ 13 — Admin quản trị tài khoản (tạo/sửa/xoá):
+Hình 3.1m: Sơ đồ hoạt động — Admin quản trị tài khoản
+Sơ đồ 14 — Sửa vai trò thành viên trong dự án:
+Hình 3.1n: Sơ đồ hoạt động — Sửa vai trò thành viên
+3.2. Sơ đồ tuần tự (Sequence Diagram)
+Sơ đồ 1 — Đăng ký tài khoản (kiểm tra trùng lặp, băm mật khẩu bcrypt):
+Hình 3.2a: Sơ đồ tuần tự — Đăng ký
+Sơ đồ 2 — Đăng nhập (nhận diện Email/SĐT, tạo JWT):
+Hình 3.2b: Sơ đồ tuần tự — Đăng nhập
+Sơ đồ 3 — Quên mật khẩu & Đặt lại mật khẩu (rẽ nhánh Email Service / SMS Service):
+Hình 3.2c: Sơ đồ tuần tự — Quên mật khẩu / Đặt lại mật khẩu
+Sơ đồ 4 — Tạo dự án & thêm thành viên:
+Hình 3.2d: Sơ đồ tuần tự — Quản lý dự án & thành viên
+Sơ đồ 5 — Tạo nhiệm vụ & cập nhật trạng thái trên Kanban:
+Hình 3.2e: Sơ đồ tuần tự — Quản lý nhiệm vụ & Kanban
+Sơ đồ 6 — Quản lý Sprint (tạo, cập nhật, xoá):
+Hình 3.2f: Sơ đồ tuần tự — Quản lý Sprint
+Sơ đồ 7 — Bình luận & đính kèm tài liệu:
+Hình 3.2g: Sơ đồ tuần tự — Bình luận & tài liệu
+Sơ đồ 8 — Tra cứu nhiệm vụ theo bộ lọc:
+Hình 3.2h: Sơ đồ tuần tự — Tra cứu nhiệm vụ
+Sơ đồ 9 — Thống kê nhiệm vụ trễ hạn & tải công việc:
+Hình 3.2i: Sơ đồ tuần tự — Thống kê
+Sơ đồ 10 — AI tóm tắt tiến độ tuần (dùng đúng mẫu Prompt System/User):
+Hình 3.2j: Sơ đồ tuần tự — AI tóm tắt tiến độ tuần
+Sơ đồ 11 — AI sinh biên bản họp (lưu MeetingNote gốc trước khi gọi AI):
+Hình 3.2k: Sơ đồ tuần tự — AI sinh biên bản họp
+Sơ đồ 12 — AI gợi ý phân công nhiệm vụ (công thức Skill_Match & Workload_Score):
+Hình 3.2l: Sơ đồ tuần tự — AI gợi ý phân công nhiệm vụ
+Sơ đồ 13 — Đổi mật khẩu khi đã đăng nhập:
+Hình 3.2m: Sơ đồ tuần tự — Đổi mật khẩu
+Sơ đồ 14 — Đăng xuất (thu hồi token qua jti):
+Hình 3.2n: Sơ đồ tuần tự — Đăng xuất
+Sơ đồ 15 — Tự sửa thông tin cá nhân & cập nhật Avatar:
+Hình 3.2o: Sơ đồ tuần tự — Tự sửa Profile & Avatar
+Sơ đồ 16 — Admin quản trị tài khoản (tạo/sửa/xoá):
+Hình 3.2p: Sơ đồ tuần tự — Admin quản trị tài khoản
+Sơ đồ 17 — Sửa vai trò thành viên trong dự án:
+Hình 3.2q: Sơ đồ tuần tự — Sửa vai trò thành viên
