@@ -2,16 +2,16 @@
 
 @layer base {
   :root {
-    --primary: #E50914; /* Netflix Red Accent */
-    --primary-hover: #b9090b;
-    --primary-blue: #3B82F6;
-    --primary-light: rgba(229, 9, 20, 0.15);
-    --bg-main: #09090B; /* Netflix/Vercel Deep Obsidian */
-    --card-bg: #18181B; /* Charcoal dark */
-    --text-heading: #F4F4F5;
-    --text-body: #A1A1AA;
-    --text-muted: #71717A;
-    --border-color: rgba(255, 255, 255, 0.1);
+    --primary: #DC2626; /* G9 Corporate Red */
+    --primary-hover: #B91C1C;
+    --primary-blue: #2563EB;
+    --primary-light: rgba(220, 38, 38, 0.1);
+    --bg-main: #F8FAFC; /* Crisp Light Slate 50 */
+    --card-bg: #FFFFFF; /* Pure White */
+    --text-heading: #0F172A; /* Slate 900 */
+    --text-body: #334155; /* Slate 700 */
+    --text-muted: #64748B; /* Slate 500 */
+    --border-color: #E2E8F0; /* Slate 200 */
   }
 
   body {
@@ -23,46 +23,47 @@
   }
 }
 
-/* Custom Scrollbar - Dark Mode */
+/* Custom Scrollbar - Light Corporate Theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #09090B;
+  background: #F8FAFC;
 }
 ::-webkit-scrollbar-thumb {
-  background: #27272A;
+  background: #CBD5E1;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3F3F46;
+  background: #94A3B8;
 }
 
-/* Skeleton Loading Shimmer Dark */
-@keyframes shimmer-dark {
+/* Skeleton Loading Shimmer Light */
+@keyframes shimmer-light {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 .skeleton-loader {
-  background: linear-gradient(90deg, #18181B 25%, #27272A 50%, #18181B 75%);
+  background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
   background-size: 200% 100%;
-  animation: shimmer-dark 1.5s infinite;
+  animation: shimmer-light 1.5s infinite;
   border-radius: 8px;
 }
 
-/* Glassmorphism Dark Cards */
-.glass-card-dark {
-  background: rgba(24, 24, 27, 0.85);
+/* Glassmorphism Light Cards */
+.glass-card-light {
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
-/* Glowing Border effect */
+/* Glowing Accent Border effects */
 .glow-border-red {
-  box-shadow: 0 0 15px -3px rgba(229, 9, 20, 0.3);
+  box-shadow: 0 0 15px -3px rgba(220, 38, 38, 0.2);
 }
 
 .glow-border-blue {
-  box-shadow: 0 0 15px -3px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 15px -3px rgba(37, 99, 235, 0.2);
 }

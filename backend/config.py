@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -9,7 +10,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./g9_pm.db"
     UPLOAD_DIR: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 
+    # LLM Settings (Rule R2: Default claude-sonnet-5, configurable via ENV)
+    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_MODEL: str = "claude-sonnet-5"
+
     class Config:
         env_file = ".env"
 
 settings = Settings()
+

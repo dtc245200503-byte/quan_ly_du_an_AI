@@ -55,11 +55,13 @@ def format_task_response(t: Task) -> TaskResponse:
         reporter=reporter_res,
         due_date=t.due_date,
         estimated_hours=t.estimated_hours or 0.0,
+        ai_risk_score=getattr(t, 'ai_risk_score', 0.0) or 0.0,
         comments=comments_res,
         attachments=attachments_res,
         created_at=t.created_at,
         updated_at=t.updated_at
     )
+
 
 @router.get("/", response_model=List[TaskResponse])
 def get_tasks(

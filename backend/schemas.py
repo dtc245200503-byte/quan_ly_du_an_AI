@@ -200,6 +200,7 @@ class TaskResponse(BaseModel):
     reporter: Optional[UserResponse] = None
     due_date: Optional[datetime.datetime] = None
     estimated_hours: float
+    ai_risk_score: Optional[float] = 0.0
     comments: List[CommentResponse] = []
     attachments: List[AttachmentResponse] = []
     created_at: datetime.datetime
@@ -207,6 +208,7 @@ class TaskResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 
 # AI Schemas
@@ -304,4 +306,63 @@ class AIChatResponse(BaseModel):
     reply: str
     suggested_actions: Optional[List[str]] = []
     context_used: Optional[dict] = None
+    source: Optional[str] = "llm"
+
+
+class ChatMessageResponse(BaseModel):
+    id: int
+    project_id: Optional[int] = None
+    user_id: int
+    role: str
+    content: str
+    created_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AIReportResponse(BaseModel):
+    id: int
+    project_id: int
+    report_type: str
+    content: str
+    generated_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RiskTaskSummary(BaseModel):
+    id: int
+    title: str
+    ai_risk_score: float
+    status: str
+    due_date: Optional[datetime.datetime] = None
+
+
+class RiskAnalysisResponse(BaseModel):
+    project_id: int
+    analyzed_tasks_count: int
+    high_risk_tasks: List[RiskTaskSummary]
+    message: str
+
+
+class AIFeedbackCreate(BaseModel):
+    feature: str # "chat", "suggest_assignment", "weekly_summary"
+    rating: str # "up", "down"
+    note: Optional[str] = None
+
+
+class AIFeedbackResponse(BaseModel):
+    id: int
+    user_id: int
+    feature: str
+    rating: str
+    note: Optional[str] = None
+    created_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+
 

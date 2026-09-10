@@ -4,15 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
-from backend.database import Base, engine
+from backend.database import Base, engine, init_db_schema
 from backend.routers import (
     auth, users, projects, sprints, tasks, comments_attachments, reports, ai, meetings, ai_chat
 )
 
-# Initialize Database Tables
+# Initialize Database Tables & Auto-patch Schema (Rule R1)
 Base.metadata.create_all(bind=engine)
+init_db_schema()
 
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

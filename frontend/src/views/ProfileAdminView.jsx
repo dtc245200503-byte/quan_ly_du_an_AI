@@ -5,14 +5,11 @@ import {
   User, 
   ShieldAlert, 
   Key, 
-  Plus, 
   X, 
   Save, 
   Users, 
   Camera, 
   Loader2, 
-  CheckCircle2,
-  Lock,
   Mail,
   Phone,
   UploadCloud
@@ -179,15 +176,15 @@ export const ProfileAdminView = ({ showToast }) => {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto text-zinc-100">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto text-slate-900">
       {/* Sub Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
         <button
           onClick={() => setActiveSubTab('profile')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeSubTab === 'profile'
-              ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-              : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           <User className="w-4 h-4" />
@@ -199,11 +196,11 @@ export const ProfileAdminView = ({ showToast }) => {
             onClick={() => setActiveSubTab('admin')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeSubTab === 'admin'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-                : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+                ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <ShieldAlert className="w-4 h-4 text-amber-500" />
             Quản Trị Hệ Thống (Admin)
           </button>
         )}
@@ -213,32 +210,32 @@ export const ProfileAdminView = ({ showToast }) => {
       {activeSubTab === 'profile' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Info Form */}
-          <div className="lg:col-span-2 bg-[#18181B] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-6">
-            <h3 className="text-base font-extrabold text-white border-b border-zinc-800 pb-3">
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+            <h3 className="text-base font-extrabold text-slate-900 border-b border-slate-200 pb-3">
               Thông Tin Cá Nhân & Kỹ Năng
             </h3>
 
-            {/* AVATAR UPLOAD COMPONENT - Direct File Upload from PC/Phone */}
-            <div className="p-4 bg-zinc-900/80 rounded-xl border border-zinc-800 flex flex-col sm:flex-row items-center gap-5">
+            {/* AVATAR UPLOAD COMPONENT */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-5">
               {/* Circular Avatar Preview */}
               <div className="relative group flex-shrink-0">
                 <img
                   src={avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
                   alt="Avatar Preview"
-                  className="w-24 h-24 rounded-full object-cover border-2 border-red-600 shadow-xl shadow-red-900/30"
+                  className="w-24 h-24 rounded-full object-cover border-2 border-red-600 shadow-md"
                 />
                 
                 {/* Upload Trigger Overlay */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
+                  className="absolute inset-0 bg-slate-900/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
                 >
-                  <Camera className="w-6 h-6 mb-1 text-red-500" />
+                  <Camera className="w-6 h-6 mb-1 text-white" />
                   <span className="text-[10px] font-bold">Đổi ảnh</span>
                 </div>
 
                 {uploadingAvatar && (
-                  <div className="absolute inset-0 bg-black/75 rounded-full flex items-center justify-center text-red-500">
+                  <div className="absolute inset-0 bg-slate-900/75 rounded-full flex items-center justify-center text-red-500">
                     <Loader2 className="w-7 h-7 animate-spin" />
                   </div>
                 )}
@@ -246,9 +243,9 @@ export const ProfileAdminView = ({ showToast }) => {
 
               {/* Upload Action Details */}
               <div className="space-y-2 text-center sm:text-left flex-1">
-                <span className="text-xs font-bold text-zinc-200 block">Ảnh đại diện tài khoản</span>
-                <p className="text-[11px] text-zinc-400">
-                  Hỗ trợ định dạng file <strong className="text-red-400">.jpg, .png, .webp</strong> từ máy tính hoặc điện thoại của bạn.
+                <span className="text-xs font-bold text-slate-900 block">Ảnh đại diện tài khoản</span>
+                <p className="text-[11px] text-slate-500">
+                  Hỗ trợ định dạng file <strong className="text-red-600">.jpg, .png, .webp</strong> từ máy tính hoặc điện thoại của bạn.
                 </p>
 
                 <input
@@ -263,7 +260,7 @@ export const ProfileAdminView = ({ showToast }) => {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingAvatar}
-                  className="px-3.5 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500/40 text-red-400 hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+                  className="px-3.5 py-1.5 bg-red-50 hover:bg-red-600 border border-red-200 text-red-700 hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs"
                 >
                   <UploadCloud className="w-4 h-4" />
                   <span>{uploadingAvatar ? 'Đang tải lên...' : 'Chọn ảnh từ máy (This PC / Mobile)'}</span>
@@ -274,70 +271,70 @@ export const ProfileAdminView = ({ showToast }) => {
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-1">Họ và tên</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Họ và tên</label>
                   <input
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-1">Chức danh / Vị trí</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Chức danh / Vị trí</label>
                   <input
                     type="text"
                     value={jobTitle}
                     onChange={(e) => setJobTitle(e.target.value)}
                     placeholder="Ví dụ: Senior Fullstack Developer"
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-1">Email liên hệ</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Email liên hệ</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-1">Số điện thoại</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Số điện thoại</label>
                   <input
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                   />
                 </div>
               </div>
 
               {/* Bio */}
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Giới thiệu bản thân (Bio)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Giới thiệu bản thân (Bio)</label>
                 <textarea
                   rows={3}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Giới thiệu kinh nghiệm và năng lực làm việc..."
-                  className="w-full p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                  className="w-full p-3 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
               {/* Skills Tags Manager */}
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Kỹ năng làm việc (dùng cho AI Gợi Ý Phân Công)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Kỹ năng làm việc (dùng cho AI Gợi Ý Phân Công)</label>
                 <div className="flex items-center gap-2 mb-2">
                   <input
                     type="text"
                     value={newSkillInput}
                     onChange={(e) => setNewSkillInput(e.target.value)}
                     placeholder="Nhập tên kỹ năng (Ví dụ: Python, React, FastAPI, Docker)..."
-                    className="flex-1 px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                    className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                   />
                   <button
                     type="button"
@@ -348,14 +345,14 @@ export const ProfileAdminView = ({ showToast }) => {
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 p-3 bg-zinc-900 border border-zinc-800 rounded-xl min-h-[48px]">
+                <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50 border border-slate-200 rounded-xl min-h-[48px]">
                   {skills.length === 0 ? (
-                    <span className="text-xs text-zinc-500 italic">Chưa thêm kỹ năng nào.</span>
+                    <span className="text-xs text-slate-400 italic">Chưa thêm kỹ năng nào.</span>
                   ) : (
                     skills.map((s, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 bg-red-950/60 text-red-400 border border-red-800/60 px-2.5 py-1 rounded-full text-xs font-bold">
+                      <span key={i} className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-full text-xs font-bold">
                         {s}
-                        <button type="button" onClick={() => handleRemoveSkill(s)} className="hover:text-white">
+                        <button type="button" onClick={() => handleRemoveSkill(s)} className="hover:text-red-900">
                           <X className="w-3 h-3" />
                         </button>
                       </span>
@@ -368,7 +365,7 @@ export const ProfileAdminView = ({ showToast }) => {
                 <button
                   type="submit"
                   disabled={savingProfile}
-                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-lg shadow-red-900/40 flex items-center gap-1.5 hover:-translate-y-0.5 transition-all"
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-md shadow-red-600/20 flex items-center gap-1.5 hover:-translate-y-0.5 transition-all"
                 >
                   <Save className="w-4 h-4" />
                   {savingProfile ? 'Đang lưu...' : 'Lưu Thay Đổi Hồ Sơ'}
@@ -378,39 +375,39 @@ export const ProfileAdminView = ({ showToast }) => {
           </div>
 
           {/* Side: Password Change Box */}
-          <div className="bg-[#18181B] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-4 self-start">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2 border-b border-zinc-800 pb-3">
-              <Key className="w-4 h-4 text-red-500" />
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 self-start">
+            <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
+              <Key className="w-4 h-4 text-red-600" />
               Đổi Mật Khẩu
             </h3>
 
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Mật khẩu hiện tại</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Mật khẩu hiện tại</label>
                 <input
                   type="password"
                   required
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Mật khẩu mới</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Mật khẩu mới</label>
                 <input
                   type="password"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={changingPwd}
-                className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs rounded-lg border border-zinc-700 transition-colors"
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg border border-slate-300 transition-colors"
               >
                 {changingPwd ? 'Đang cập nhật...' : 'Xác Nhận Đổi Mật Khẩu'}
               </button>
@@ -421,21 +418,21 @@ export const ProfileAdminView = ({ showToast }) => {
 
       {/* Sub Tab 2: Admin Users Management */}
       {activeSubTab === 'admin' && user?.role === 'Admin' && (
-        <div className="bg-[#18181B] rounded-2xl border border-white/10 shadow-2xl overflow-hidden space-y-4 p-6">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-6">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Users className="w-5 h-5 text-red-500" />
+              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-red-600" />
                 Quản Lý Tài Khoản Người Dùng ({allUsers.length})
               </h3>
-              <p className="text-xs text-zinc-400">Admin phân quyền vai trò (Admin, PM, Member) và theo dõi tài khoản hệ thống.</p>
+              <p className="text-xs text-slate-500">Admin phân quyền vai trò (Admin, PM, Member) và theo dõi tài khoản hệ thống.</p>
             </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-zinc-900 text-[11px] font-bold text-zinc-400 uppercase border-b border-zinc-800">
+                <tr className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
                   <th className="p-3">Họ và tên</th>
                   <th className="p-3">Liên hệ</th>
                   <th className="p-3">Chức danh</th>
@@ -443,31 +440,31 @@ export const ProfileAdminView = ({ showToast }) => {
                   <th className="p-3 text-right">Trạng thái</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60 text-xs font-medium">
+              <tbody className="divide-y divide-slate-100 text-xs font-medium">
                 {allUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-zinc-900/50 transition-colors">
+                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-3">
                       <div className="flex items-center gap-2.5">
                         <img
                           src={u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
                           alt={u.full_name}
-                          className="w-8 h-8 rounded-full object-cover border border-zinc-700"
+                          className="w-8 h-8 rounded-full object-cover border border-slate-300"
                         />
-                        <span className="font-bold text-zinc-100">{u.full_name}</span>
+                        <span className="font-bold text-slate-900">{u.full_name}</span>
                       </div>
                     </td>
-                    <td className="p-3 text-zinc-400">
+                    <td className="p-3 text-slate-600">
                       <div className="space-y-0.5">
-                        {u.email && <div className="flex items-center gap-1"><Mail className="w-3 h-3 text-zinc-500" /> {u.email}</div>}
-                        {u.phone_number && <div className="flex items-center gap-1"><Phone className="w-3 h-3 text-zinc-500" /> {u.phone_number}</div>}
+                        {u.email && <div className="flex items-center gap-1"><Mail className="w-3 h-3 text-slate-400" /> {u.email}</div>}
+                        {u.phone_number && <div className="flex items-center gap-1"><Phone className="w-3 h-3 text-slate-400" /> {u.phone_number}</div>}
                       </div>
                     </td>
-                    <td className="p-3 text-zinc-400">{u.job_title || 'Thành viên'}</td>
+                    <td className="p-3 text-slate-600">{u.job_title || 'Thành viên'}</td>
                     <td className="p-3">
                       <select
                         value={u.role}
                         onChange={(e) => handleUserRoleChange(u.id, e.target.value)}
-                        className="bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1 text-xs font-bold text-zinc-200"
+                        className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-red-600"
                       >
                         <option value="Member">Member</option>
                         <option value="PM">PM (Project Manager)</option>
@@ -475,7 +472,7 @@ export const ProfileAdminView = ({ showToast }) => {
                       </select>
                     </td>
                     <td className="p-3 text-right">
-                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-1 rounded border border-emerald-800/60">
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
                         Active
                       </span>
                     </td>

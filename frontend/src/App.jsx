@@ -101,11 +101,11 @@ const AppContent = () => {
 
   if (authLoading) {
     return (
-      <div className="h-screen bg-[#09090B] flex flex-col items-center justify-center space-y-4 text-white">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-red-600 to-red-500 animate-bounce flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-red-900/50">
+      <div className="h-screen bg-slate-50 flex flex-col items-center justify-center space-y-4 text-slate-900">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-red-600 to-red-500 animate-bounce flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-red-600/30">
           G9
         </div>
-        <span className="text-xs font-bold text-zinc-400 tracking-wider">Đang khởi chạy hệ thống G9 v5...</span>
+        <span className="text-xs font-bold text-slate-600 tracking-wider">Đang khởi chạy hệ thống G9 v5...</span>
       </div>
     );
   }
@@ -120,7 +120,7 @@ const AppContent = () => {
   }
 
   return (
-    <div className="flex h-screen bg-[#09090B] overflow-hidden font-sans text-zinc-100">
+    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
       {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
@@ -189,7 +189,6 @@ const AppContent = () => {
               onOpenCreateProject={() => setShowCreateProjectModal(true)}
             />
           )}
-
 
           {activeTab === 'profile' && (
             <ProfileAdminView
@@ -270,4 +269,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-

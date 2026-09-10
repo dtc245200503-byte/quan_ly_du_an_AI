@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { 
   Sparkles, 
@@ -6,29 +6,38 @@ import {
   UserCheck, 
   TrendingUp, 
   AlertTriangle, 
-  ListOrdered, 
   CheckCircle2,
-  ArrowRight,
   BrainCircuit,
   Bot,
   Video,
-  MessageSquare,
-  Send
+  Send,
+  History,
+  ThumbsUp,
+  ThumbsDown,
+  ShieldAlert
 } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
+import { MarkdownRenderer } from '../components/MarkdownRenderer';
 
 
 export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOpenCreateProject }) => {
-  const [activeTab, setActiveTab] = useState('weekly'); // 'weekly', 'minutes', 'suggest', 'chat'
+  const [activeTab, setActiveTab] = useState('weekly'); // 'weekly', 'minutes', 'suggest', 'chat', 'reports'
 
   if (!currentProject) {
     return <EmptyState onOpenCreateProject={onOpenCreateProject} />;
   }
 
-
   // Weekly summary state
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [weeklyData, setWeeklyData] = useState(null);
+
+  // Risk analysis state (Phase 4)
+  const [riskLoading, setRiskLoading] = useState(false);
+  const [riskData, setRiskData] = useState(null);
+
+  // AI Reports history state (Phase 3)
+  const [reportsList, setReportsList] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
 
   // Meeting minutes state
   const [meetingTitle, setMeetingTitle] = useState('Họp Đánh Giá Tiến Độ & Phân Công Sprint');
@@ -47,16 +56,48 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
 
   // Inline Copilot Chat state
   const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', content: 'Xin chào! Tôi là Trợ Lý AI Senior PM G9. Bạn muốn hỏi thông tin gì về tiến độ, công việc hoặc lịch họp?' }
+    { id: 'welcome', role: 'assistant', content: 'Xin chào! Tôi là Trợ Lý AI Senior PM G9. Bạn muốn hỏi thông tin gì về tiến độ, công việc hoặc lịch họp?' }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+
+  // Phase 5 Feedback state tracking
+  const [feedbacks, setFeedbacks] = useState({});
+
+  const handleFeedback = async (feature, rating, key = feature) => {
+    setFeedbacks(prev => ({ ...prev, [key]: rating }));
+    try {
+      await api.post('/api/ai/feedback', { feature, rating });
+      showToast("Cảm ơn bạn đã gửi phản hồi cho AI!", "success");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchReports = async () => {
+    if (!currentProject) return;
+    setReportsLoading(true);
+    try {
+      const res = await api.get(`/api/ai/reports?project_id=${currentProject.id}`);
+      setReportsList(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      fetchReports();
+    }
+  }, [activeTab, currentProject]);
 
   const handleSendInlineChat = async (prompt) => {
     const text = prompt || chatInput;
     if (!text.trim()) return;
 
-    const newMsgs = [...chatMessages, { role: 'user', content: text.trim() }];
+    const newMsgs = [...chatMessages, { id: `user-${Date.now()}`, role: 'user', content: text.trim() }];
     setChatMessages(newMsgs);
     if (!prompt) setChatInput('');
     setChatLoading(true);
@@ -65,17 +106,17 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
       const res = await api.post('/api/ai-chat/chat', {
         project_id: currentProject ? currentProject.id : null,
         message: text.trim(),
-        history: newMsgs.filter(m => m.role !== 'system')
+        history: newMsgs.filter(m => m.id !== 'welcome').map(m => ({ role: m.role, content: m.content }))
       });
-      setChatMessages([...newMsgs, { role: 'assistant', content: res.data.reply }]);
+      setChatMessages([...newMsgs, { id: `bot-${Date.now()}`, role: 'assistant', content: res.data.reply }]);
     } catch (err) {
-      setChatMessages([...newMsgs, { role: 'assistant', content: '❌ Lỗi khi kết nối với AI Chat Engine.' }]);
+      setChatMessages([...newMsgs, { id: `bot-err-${Date.now()}`, role: 'assistant', content: '❌ Lỗi khi kết nối với AI Chat Engine.' }]);
     } finally {
       setChatLoading(false);
     }
   };
 
-  // Handlers
+  // Phase 3 & R4: Weekly Summary Generator
   const handleWeeklySummary = async () => {
     if (!currentProject) {
       showToast("Vui lòng chọn dự án trước khi sinh tóm tắt", "error");
@@ -86,10 +127,32 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
       const res = await api.post('/api/ai/weekly-summary', { project_id: currentProject.id });
       setWeeklyData(res.data);
       showToast("Tạo tóm tắt tiến độ thành công!", "success");
+      // Rule R4: Tự động tải lại danh sách báo cáo
+      fetchReports();
     } catch (err) {
       showToast("Lỗi khi kết nối AI Weekly Summary", "error");
     } finally {
       setWeeklyLoading(false);
+    }
+  };
+
+  // Phase 4 & R4: Risk Analysis Generator
+  const handleAnalyzeRisk = async () => {
+    if (!currentProject) {
+      showToast("Vui lòng chọn dự án trước", "error");
+      return;
+    }
+    setRiskLoading(true);
+    try {
+      const res = await api.post('/api/ai/analyze-risk', { project_id: currentProject.id });
+      setRiskData(res.data);
+      showToast(`Đã phân tích rủi ro! Phát hiện ${res.data.high_risk_tasks.length} task nguy cơ cao.`, "success");
+      // Rule R4: Tự động cập nhật báo cáo
+      fetchReports();
+    } catch (err) {
+      showToast("Lỗi khi phân tích rủi ro AI", "error");
+    } finally {
+      setRiskLoading(false);
     }
   };
 
@@ -139,18 +202,18 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto text-zinc-100">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto text-slate-900">
       {/* AI Hub Header Banner */}
-      <div className="bg-gradient-to-r from-red-950 via-zinc-900 to-black p-6 rounded-2xl text-white shadow-2xl border border-white/10 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-red-600 via-red-700 to-slate-900 p-6 rounded-2xl text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="p-2 bg-red-600/30 rounded-xl border border-red-500/50">
-                <BrainCircuit className="w-5 h-5 text-red-500" />
+              <span className="p-2 bg-white/20 rounded-xl border border-white/30">
+                <BrainCircuit className="w-5 h-5 text-white" />
               </span>
               <h1 className="text-xl font-black">G9 AI Hub — Trợ Lý Quản Lý Dự Án Smart</h1>
             </div>
-            <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
+            <p className="text-xs text-red-100 max-w-2xl leading-relaxed">
               Trí tuệ nhân tạo tóm tắt tiến độ tuần, tự động trích xuất biên bản họp, thuật toán gợi ý phân công nhiệm vụ và Trợ lý AI Copilot Chat Engine RAG Light.
             </p>
           </div>
@@ -159,28 +222,28 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
             {onOpenCreateMeeting && (
               <button
                 onClick={onOpenCreateMeeting}
-                className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+                className="px-3.5 py-2 bg-white hover:bg-slate-100 text-red-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
               >
-                <Video className="w-4 h-4 text-red-500" />
+                <Video className="w-4 h-4 text-red-700" />
                 <span>Tạo Cuộc Họp Online</span>
               </button>
             )}
-            <div className="flex items-center gap-2 bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-xs font-bold text-red-400">
-              <Bot className="w-4 h-4 text-red-500" />
+            <div className="flex items-center gap-2 bg-black/20 p-2 rounded-xl border border-white/20 text-xs font-bold text-white">
+              <Bot className="w-4 h-4 text-white" />
               <span>Project: {currentProject?.name || 'Chưa chọn'}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 pb-3">
+      {/* Tabs Navigation */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
         <button
           onClick={() => setActiveTab('weekly')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'weekly'
-              ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-              : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           <TrendingUp className="w-4 h-4" />
@@ -191,8 +254,8 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
           onClick={() => setActiveTab('minutes')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'minutes'
-              ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-              : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           <FileText className="w-4 h-4" />
@@ -203,8 +266,8 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
           onClick={() => setActiveTab('suggest')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'suggest'
-              ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-              : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           <UserCheck className="w-4 h-4" />
@@ -215,28 +278,39 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
           onClick={() => setActiveTab('chat')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'chat'
-              ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-              : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           <Bot className="w-4 h-4" />
           4. Copilot Chat Engine
         </button>
-      </div>
 
+        <button
+          onClick={() => setActiveTab('reports')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'reports'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          5. Báo Cáo & Phân Tích Rủi Ro
+        </button>
+      </div>
 
       {/* Tab 1: Weekly Summary Generator */}
       {activeTab === 'weekly' && (
-        <div className="bg-[#18181B] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-extrabold text-white">Báo Cáo Tiến Độ Tuần Tự Động (Weekly Progress Summary)</h3>
-              <p className="text-xs text-zinc-400">Phân tích tổng quan số lượng nhiệm vụ completed vs pending, rủi ro đe dọa tiến độ và ưu tiên cao nhất.</p>
+              <h3 className="text-base font-extrabold text-slate-900">Báo Cáo Tiến Độ Tuần Tự Động (Weekly Progress Summary)</h3>
+              <p className="text-xs text-slate-500">Phân tích tổng quan số lượng nhiệm vụ completed vs pending, rủi ro đe dọa tiến độ và ưu tiên cao nhất.</p>
             </div>
             <button
               onClick={handleWeeklySummary}
               disabled={weeklyLoading}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-lg shadow-red-900/40 flex items-center gap-2 transition-all hover:-translate-y-0.5"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md shadow-red-600/20 flex items-center gap-2 transition-all hover:-translate-y-0.5"
             >
               <Sparkles className="w-4 h-4" />
               {weeklyLoading ? 'AI Đang Phân Tích...' : 'Sinh Báo Cáo Ngay'}
@@ -244,24 +318,46 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
           </div>
 
           {weeklyData ? (
-            <div className="space-y-4 pt-4 border-t border-zinc-800">
+            <div className="space-y-4 pt-4 border-t border-slate-100">
               {/* Executive Summary Card */}
-              <div className="p-4 bg-zinc-900/90 border border-red-500/30 rounded-xl text-xs font-medium text-zinc-200 leading-relaxed">
-                <span className="font-extrabold text-red-400 block mb-1">📝 Tóm Tắt Tổng Quan:</span>
-                {weeklyData.summary}
+              <div className="p-4 bg-slate-50 border border-red-200 rounded-xl text-xs font-medium text-slate-800 leading-relaxed relative">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-extrabold text-red-600 block">📝 Tóm Tắt Tổng Quan:</span>
+                  {/* Phase 5 Feedback */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      disabled={!!feedbacks['weekly_summary']}
+                      onClick={() => handleFeedback('weekly_summary', 'up', 'weekly_summary')}
+                      className={`p-1 rounded hover:bg-slate-200 ${feedbacks['weekly_summary'] === 'up' ? 'text-emerald-600 font-bold bg-emerald-50' : 'text-slate-400'}`}
+                      title="Hữu ích"
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      disabled={!!feedbacks['weekly_summary']}
+                      onClick={() => handleFeedback('weekly_summary', 'down', 'weekly_summary')}
+                      className={`p-1 rounded hover:bg-slate-200 ${feedbacks['weekly_summary'] === 'down' ? 'text-rose-600 font-bold bg-rose-50' : 'text-slate-400'}`}
+                      title="Chưa chính xác"
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <MarkdownRenderer content={weeklyData.summary} />
               </div>
+
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Identified Risks */}
-                <div className="p-4 bg-rose-950/30 border border-rose-800/60 rounded-xl space-y-2">
-                  <h4 className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-rose-500" />
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
+                  <h4 className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
                     Rủi Ro Cần Lưu Ý ({weeklyData.risks.length})
                   </h4>
-                  <ul className="space-y-1.5 text-xs text-rose-200 font-medium">
+                  <ul className="space-y-1.5 text-xs text-rose-800 font-medium">
                     {weeklyData.risks.map((r, i) => (
                       <li key={i} className="flex items-start gap-2">
-                        <span className="text-rose-500">•</span>
+                        <span className="text-rose-600">•</span>
                         <span>{r}</span>
                       </li>
                     ))}
@@ -269,15 +365,15 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
                 </div>
 
                 {/* Priority Actions */}
-                <div className="p-4 bg-emerald-950/30 border border-emerald-800/60 rounded-xl space-y-2">
-                  <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+                  <h4 className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     Hành Động Ưu Tiên Hàng Đầu
                   </h4>
-                  <ul className="space-y-1.5 text-xs text-emerald-200 font-medium">
+                  <ul className="space-y-1.5 text-xs text-emerald-800 font-medium">
                     {weeklyData.priorities.map((p, i) => (
                       <li key={i} className="flex items-start gap-2">
-                        <span className="text-emerald-400 font-bold">{i + 1}.</span>
+                        <span className="text-emerald-700 font-bold">{i + 1}.</span>
                         <span>{p}</span>
                       </li>
                     ))}
@@ -286,7 +382,7 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
               </div>
             </div>
           ) : (
-            <div className="p-12 text-center text-xs text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
+            <div className="p-12 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl">
               Nhấn nút "Sinh Báo Cáo Ngay" để trí tuệ nhân tạo phân tích tiến độ dự án.
             </div>
           )}
@@ -297,36 +393,36 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
       {activeTab === 'minutes' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Form Input */}
-          <div className="bg-[#18181B] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-4">
-            <h3 className="text-base font-extrabold text-white">Nhập Ghi Chú Thô Cuộc Họp</h3>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-base font-extrabold text-slate-900">Nhập Ghi Chú Thô Cuộc Họp</h3>
             <form onSubmit={handleMeetingMinutes} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Tiêu đề cuộc họp</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Tiêu đề cuộc họp</label>
                 <input
                   type="text"
                   required
                   value={meetingTitle}
                   onChange={(e) => setMeetingTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Nội dung ghi chú thô (Raw Notes)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Nội dung ghi chú thô (Raw Notes)</label>
                 <textarea
                   rows={8}
                   required
                   value={rawNotes}
                   onChange={(e) => setRawNotes(e.target.value)}
                   placeholder="Dán nội dung trao đổi cuộc họp tại đây..."
-                  className="w-full p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                  className="w-full p-3 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={minutesLoading}
-                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-lg shadow-red-900/40 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md shadow-red-600/20 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
               >
                 <Sparkles className="w-4 h-4" />
                 {minutesLoading ? 'AI Đang Sinh Biên Bản...' : 'Tạo Biên Bản Cuộc Họp AI'}
@@ -335,22 +431,22 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
           </div>
 
           {/* Generated Minutes Result */}
-          <div className="bg-[#18181B] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-4">
-            <h3 className="text-base font-extrabold text-white">Biên Bản Chuẩn Hóa</h3>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-base font-extrabold text-slate-900">Biên Bản Chuẩn Hóa</h3>
 
             {minutesData ? (
               <div className="space-y-4">
-                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-                  <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider block">Tóm tắt thảo luận</span>
-                  <p className="text-xs text-zinc-300 leading-relaxed font-medium">{minutesData.ai_summary}</p>
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <span className="text-[11px] font-bold text-red-600 uppercase tracking-wider block">Tóm tắt thảo luận</span>
+                  <p className="text-xs text-slate-800 leading-relaxed font-medium">{minutesData.ai_summary}</p>
                 </div>
 
-                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-                  <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider block">Danh sách Action Items (Việc cần làm)</span>
-                  <ul className="space-y-2 text-xs font-medium text-zinc-200">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">Danh sách Action Items (Việc cần làm)</span>
+                  <ul className="space-y-2 text-xs font-medium text-slate-800">
                     {minutesData.action_items.map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2 bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                      <li key={idx} className="flex items-start gap-2 bg-white p-2.5 rounded-lg border border-slate-200">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                         <span>{item}</span>
                       </li>
                     ))}
@@ -358,7 +454,7 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
                 </div>
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center p-12 text-center text-xs text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
+              <div className="h-full flex items-center justify-center p-12 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl">
                 Kết quả biên bản cuộc họp và Action Items sẽ hiển thị ở đây.
               </div>
             )}
@@ -370,36 +466,36 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
       {activeTab === 'suggest' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Form Input */}
-          <div className="bg-[#18181B] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-4">
-            <h3 className="text-base font-extrabold text-white">Nhập Yêu Cầu Nhiệm Vụ Cần Phân Công</h3>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-base font-extrabold text-slate-900">Nhập Yêu Cầu Nhiệm Vụ Cần Phân Công</h3>
             <form onSubmit={handleSuggestAssignment} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Tên nhiệm vụ</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Tên nhiệm vụ</label>
                 <input
                   type="text"
                   required
                   value={taskTitleInput}
                   onChange={(e) => setTaskTitleInput(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Kỹ năng bắt buộc (phân cách bằng dấu phẩy)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Kỹ năng bắt buộc (phân cách bằng dấu phẩy)</label>
                 <input
                   type="text"
                   required
                   value={skillsInput}
                   onChange={(e) => setSkillsInput(e.target.value)}
                   placeholder="Python, FastAPI, SQL..."
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-medium text-white focus:ring-2 focus:ring-red-600"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={suggestLoading}
-                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-lg shadow-red-900/40 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md shadow-red-600/20 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
               >
                 <UserCheck className="w-4 h-4" />
                 {suggestLoading ? 'AI Đang Tính Toán Match...' : 'Phân Tích & Phân Công Nhiệm Vụ'}
@@ -408,28 +504,50 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
           </div>
 
           {/* Candidates Ranking List */}
-          <div className="bg-[#18181B] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-4">
-            <h3 className="text-base font-extrabold text-white">Kết Quả Phân Tích Kỹ Năng & Workload</h3>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-extrabold text-slate-900">Kết Quả Phân Tích Kỹ Năng & Workload</h3>
+              {suggestData && (
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={!!feedbacks['suggest_assignment']}
+                    onClick={() => handleFeedback('suggest_assignment', 'up', 'suggest_assignment')}
+                    className={`p-1 rounded hover:bg-slate-200 ${feedbacks['suggest_assignment'] === 'up' ? 'text-emerald-600 font-bold bg-emerald-50' : 'text-slate-400'}`}
+                    title="Hữu ích"
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    disabled={!!feedbacks['suggest_assignment']}
+                    onClick={() => handleFeedback('suggest_assignment', 'down', 'suggest_assignment')}
+                    className={`p-1 rounded hover:bg-slate-200 ${feedbacks['suggest_assignment'] === 'down' ? 'text-rose-600 font-bold bg-rose-50' : 'text-slate-400'}`}
+                    title="Chưa chính xác"
+                  >
+                    <ThumbsDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
 
             {suggestData ? (
               <div className="space-y-3">
                 {/* Best Suggested Winner */}
                 {suggestData.suggested_assignee && (
-                  <div className="p-4 bg-emerald-950/40 border border-emerald-500/60 rounded-xl space-y-2">
-                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-900/80 px-2 py-0.5 rounded">
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+                    <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest bg-emerald-100 px-2 py-0.5 rounded">
                       🏆 Ứng viên tối ưu nhất (Best Match)
                     </span>
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="text-sm font-bold text-white">{suggestData.suggested_assignee.full_name}</h4>
-                        <span className="text-xs text-zinc-400">{suggestData.suggested_assignee.job_title}</span>
+                        <h4 className="text-sm font-bold text-slate-900">{suggestData.suggested_assignee.full_name}</h4>
+                        <span className="text-xs text-slate-500">{suggestData.suggested_assignee.job_title}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-xl font-black text-emerald-400">{suggestData.suggested_assignee.final_score}</span>
-                        <span className="text-[10px] text-zinc-500 block">Điểm tổng hợp</span>
+                        <span className="text-xl font-black text-emerald-600">{suggestData.suggested_assignee.final_score}</span>
+                        <span className="text-[10px] text-slate-500 block">Điểm tổng hợp</span>
                       </div>
                     </div>
-                    <p className="text-xs text-zinc-300 border-t border-emerald-900/60 pt-2 italic">
+                    <p className="text-xs text-slate-700 border-t border-emerald-200 pt-2 italic">
                       💡 {suggestData.suggested_assignee.reason}
                     </p>
                   </div>
@@ -437,27 +555,27 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
 
                 {/* All Candidates Ranking Table */}
                 <div className="space-y-2 pt-2">
-                  <span className="text-xs font-bold text-zinc-300 block">Xếp hạng tất cả thành viên trong dự án:</span>
+                  <span className="text-xs font-bold text-slate-700 block">Xếp hạng tất cả thành viên trong dự án:</span>
                   <div className="space-y-2">
                     {suggestData.all_candidates.map((cand, idx) => (
-                      <div key={cand.user_id} className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between text-xs">
+                      <div key={cand.user_id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2.5">
-                          <span className="font-bold text-zinc-500 w-4">#{idx + 1}</span>
+                          <span className="font-bold text-slate-400 w-4">#{idx + 1}</span>
                           <div>
-                            <span className="font-bold text-white block">{cand.full_name}</span>
-                            <span className="text-[11px] text-zinc-400">
+                            <span className="font-bold text-slate-900 block">{cand.full_name}</span>
+                            <span className="text-[11px] text-slate-500">
                               Workload: {cand.current_workload_hours}h | Skill Match: {cand.skill_match_score}%
                             </span>
                           </div>
                         </div>
-                        <span className="font-black text-red-500 text-sm">{cand.final_score} điểm</span>
+                        <span className="font-black text-red-600 text-sm">{cand.final_score} điểm</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center p-12 text-center text-xs text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
+              <div className="h-full flex items-center justify-center p-12 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl">
                 Nhập yêu cầu nhiệm vụ và bấm Phân Tích để AI đánh giá năng lực & tải công việc.
               </div>
             )}
@@ -467,16 +585,15 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
 
       {/* Tab 4: Copilot Chat Engine */}
       {activeTab === 'chat' && (
-
-        <div className="bg-[#18181B] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Bot className="w-5 h-5 text-red-500" />
+              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <Bot className="w-5 h-5 text-red-600" />
                 Trợ Lý Copilot Chat Engine (Persona Senior PM G9)
               </h3>
-              <p className="text-xs text-zinc-400">
-                Chat trực tiếp với AI chuyên gia quản trị dự án, tự động bơm dữ liệu thực tế (Tasks, Workloads, Meetings) từ SQLite CSDL.
+              <p className="text-xs text-slate-500">
+                Chat trực tiếp với AI chuyên gia quản trị dự án, tự động bơm dữ liệu thực tế (Tasks, Workloads, Meetings) từ CSDL.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -484,7 +601,7 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
                 <button
                   key={i}
                   onClick={() => handleSendInlineChat(p)}
-                  className="px-3 py-1.5 bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 text-zinc-300 text-xs font-bold rounded-lg transition-all"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-all"
                 >
                   {p}
                 </button>
@@ -492,15 +609,15 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
             </div>
           </div>
 
-          <div className="h-96 bg-[#09090B] p-4 rounded-xl border border-zinc-800 overflow-y-auto space-y-3">
-            {chatMessages.map((m, i) => (
-              <div key={i} className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <div className="h-96 bg-slate-50 p-4 rounded-xl border border-slate-200 overflow-y-auto space-y-3">
+            {chatMessages.map((m) => (
+              <div key={m.id} className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className={`p-3 rounded-2xl text-xs max-w-[80%] ${
                   m.role === 'user'
                     ? 'bg-red-600 text-white font-medium rounded-tr-none'
-                    : 'bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-tl-none whitespace-pre-wrap'
+                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none whitespace-pre-wrap shadow-xs'
                 }`}>
-                  {m.content}
+                  {m.role === 'user' ? m.content : <MarkdownRenderer content={m.content} />}
                 </div>
               </div>
             ))}
@@ -513,12 +630,12 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Nhập câu hỏi bất kỳ cho Chuyên gia AI G9..."
               disabled={chatLoading}
-              className="flex-1 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white focus:ring-2 focus:ring-red-600 focus:outline-none"
+              className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-red-600 focus:outline-none"
             />
             <button
               type="submit"
               disabled={chatLoading || !chatInput.trim()}
-              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-red-900/40"
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-600/20"
             >
               <Send className="w-4 h-4" />
               {chatLoading ? 'Đang hỏi...' : 'Gửi'}
@@ -526,7 +643,100 @@ export const AIHubView = ({ currentProject, showToast, onOpenCreateMeeting, onOp
           </form>
         </div>
       )}
+
+      {/* Tab 5: AI Reports & Risk Analysis (Phase 3 & Phase 4) */}
+      {activeTab === 'reports' && (
+        <div className="space-y-6">
+          {/* Risk Analysis Trigger Action */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="space-y-1">
+              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-rose-600" />
+                Phân Tích Tiến Độ & Đánh Giá Rủi Ro Tự Động (AI Risk Engine)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Tính toán chỉ số ai_risk_score cho toàn bộ task trong dự án, hiển thị cảnh báo đỏ trực tiếp trên bảng Kanban.
+              </p>
+            </div>
+            <button
+              onClick={handleAnalyzeRisk}
+              disabled={riskLoading}
+              className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-600/20 flex items-center gap-2 transition-all hover:-translate-y-0.5"
+            >
+              <Sparkles className="w-4 h-4" />
+              {riskLoading ? 'Đang tính điểm Rủi Ro...' : 'Chạy Phân Tích Rủi Ro'}
+            </button>
+          </div>
+
+          {riskData && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-3">
+              <h4 className="text-xs font-extrabold text-rose-800 flex items-center justify-between">
+                <span>{riskData.message}</span>
+                <span className="bg-rose-200 text-rose-900 text-[10px] font-black px-2 py-0.5 rounded">
+                  High Risk: {riskData.high_risk_tasks.length}
+                </span>
+              </h4>
+              {riskData.high_risk_tasks.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {riskData.high_risk_tasks.map(t => (
+                    <div key={t.id} className="p-2.5 bg-white border border-rose-200 rounded-lg flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-slate-900 block line-clamp-1">{t.title}</span>
+                        <span className="text-[10px] text-slate-500">Trạng thái: {t.status}</span>
+                      </div>
+                      <span className="text-xs font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                        Score: {Math.round(t.ai_risk_score * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AI Reports History List (Phase 3) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <History className="w-5 h-5 text-red-600" />
+                Lịch Sử Các Báo Cáo AI Đã Lưu (bảng AI_Reports)
+              </h3>
+              <button
+                onClick={fetchReports}
+                disabled={reportsLoading}
+                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors"
+              >
+                {reportsLoading ? 'Đang tải...' : 'Làm mới'}
+              </button>
+            </div>
+
+            {reportsList.length > 0 ? (
+              <div className="space-y-3">
+                {reportsList.map(rep => (
+                  <div key={rep.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded uppercase text-[10px]">
+                        {rep.report_type}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {new Date(rep.generated_at).toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+                    <div className="pt-1">
+                      <MarkdownRenderer content={rep.content} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+            ) : (
+              <div className="p-12 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl">
+                Chưa có báo cáo AI nào được lưu. Hãy bấm "Sinh Báo Cáo Ngay" hoặc "Chạy Phân Tích Rủi Ro" ở trên!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-

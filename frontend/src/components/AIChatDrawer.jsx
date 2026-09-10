@@ -6,177 +6,15 @@ import {
   Send, 
   X, 
   Minimize2, 
-  Maximize2, 
   Copy, 
-  Check, 
-  RefreshCw, 
-  MessageSquare,
-  ChevronDown
+  Check,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
-
-// Custom Markdown & Code Renderer for obsidian dark mode
-const MarkdownRenderer = ({ content }) => {
-  const [copiedIndex, setCopiedIndex] = useState(null);
-
-  const copyToClipboard = (text, index) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
-  // Simple clean parser for bold, inline code, headers, code blocks, lists, links
-  const renderFormattedText = (text) => {
-    const lines = text.split('\n');
-    let inCodeBlock = false;
-    let codeBlockContent = [];
-    let codeBlockLang = '';
-
-    return lines.map((line, lIdx) => {
-      // Code block start/end
-      if (line.trim().startsWith('```')) {
-        if (inCodeBlock) {
-          inCodeBlock = false;
-          const codeText = codeBlockContent.join('\n');
-          codeBlockContent = [];
-          const currentCodeIdx = lIdx;
-          return (
-            <div key={lIdx} className="my-2 bg-[#09090B] border border-zinc-800 rounded-xl overflow-hidden font-mono text-xs">
-              <div className="bg-zinc-900/90 px-3 py-1.5 border-b border-zinc-800 flex items-center justify-between text-[10px] text-zinc-400">
-                <span className="uppercase font-bold">{codeBlockLang || 'code'}</span>
-                <button 
-                  onClick={() => copyToClipboard(codeText, currentCodeIdx)}
-                  className="flex items-center gap-1 hover:text-white transition-colors"
-                >
-                  {copiedIndex === currentCodeIdx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span>{copiedIndex === currentCodeIdx ? 'Đã chép' : 'Sao chép'}</span>
-                </button>
-              </div>
-              <pre className="p-3 overflow-x-auto text-zinc-200 text-[11px] leading-relaxed">
-                <code>{codeText}</code>
-              </pre>
-            </div>
-          );
-        } else {
-          inCodeBlock = true;
-          codeBlockLang = line.trim().replace('```', '');
-          return null;
-        }
-      }
-
-      if (inCodeBlock) {
-        codeBlockContent.push(line);
-        return null;
-      }
-
-      // Headers
-      if (line.startsWith('### ')) {
-        return <h4 key={lIdx} className="text-xs font-black text-white mt-2 mb-1">{line.replace('### ', '')}</h4>;
-      }
-      if (line.startsWith('#### ')) {
-        return <h5 key={lIdx} className="text-xs font-bold text-red-400 mt-2 mb-1">{line.replace('#### ', '')}</h5>;
-      }
-
-      // Bullet lists
-      if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
-        const itemText = line.trim().substring(2);
-        return (
-          <li key={lIdx} className="ml-3 my-0.5 list-disc text-zinc-300">
-            {parseInline(itemText)}
-          </li>
-        );
-      }
-
-      // Numbered lists
-      if (/^\d+\.\s/.test(line.trim())) {
-        return (
-          <div key={lIdx} className="ml-2 my-0.5 text-zinc-300 font-medium">
-            {parseInline(line)}
-          </div>
-        );
-      }
-
-      if (!line.trim()) return <div key={lIdx} className="h-1.5" />;
-
-      return <p key={lIdx} className="my-1 leading-relaxed text-zinc-200">{parseInline(line)}</p>;
-    });
-  };
-
-  const parseInline = (text) => {
-    // Replace **bold**, `code`, and [link](url)
-    const parts = [];
-    let remaining = text;
-    let keyIdx = 0;
-
-    while (remaining.length > 0) {
-      // Bold
-      const boldMatch = remaining.match(/\*\*(.*?)\*\*/);
-      // Code
-      const codeMatch = remaining.match(/`(.*?)`/);
-      // Link
-      const linkMatch = remaining.match(/\[(.*?)\]\((.*?)\)/);
-
-      // Find first match
-      let firstMatch = null;
-      let matchType = null;
-      let minPos = remaining.length;
-
-      if (boldMatch && boldMatch.index < minPos) {
-        minPos = boldMatch.index;
-        firstMatch = boldMatch;
-        matchType = 'bold';
-      }
-      if (codeMatch && codeMatch.index < minPos) {
-        minPos = codeMatch.index;
-        firstMatch = codeMatch;
-        matchType = 'code';
-      }
-      if (linkMatch && linkMatch.index < minPos) {
-        minPos = linkMatch.index;
-        firstMatch = linkMatch;
-        matchType = 'link';
-      }
-
-      if (!firstMatch) {
-        parts.push(<span key={keyIdx++}>{remaining}</span>);
-        break;
-      }
-
-      if (firstMatch.index > 0) {
-        parts.push(<span key={keyIdx++}>{remaining.substring(0, firstMatch.index)}</span>);
-      }
-
-      if (matchType === 'bold') {
-        parts.push(<strong key={keyIdx++} className="font-black text-white">{firstMatch[1]}</strong>);
-      } else if (matchType === 'code') {
-        parts.push(
-          <code key={keyIdx++} className="px-1.5 py-0.5 bg-zinc-900 border border-zinc-700/80 rounded font-mono text-[11px] text-red-400">
-            {firstMatch[1]}
-          </code>
-        );
-      } else if (matchType === 'link') {
-        parts.push(
-          <a 
-            key={keyIdx++} 
-            href={firstMatch[2]} 
-            target="_blank" 
-            rel="noreferrer" 
-            className="text-red-400 font-bold underline hover:text-red-300"
-          >
-            {firstMatch[1]}
-          </a>
-        );
-      }
-
-      remaining = remaining.substring(firstMatch.index + firstMatch[0].length);
-    }
-
-    return parts;
-  };
-
-  return <div className="space-y-1 text-xs">{renderFormattedText(content)}</div>;
-};
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 export const AIChatDrawer = ({ currentProject, showToast }) => {
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -202,9 +40,61 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const fetchHistory = async () => {
+    try {
+      let query = '/api/ai-chat/history';
+      if (currentProject) query += `?project_id=${currentProject.id}`;
+      const res = await api.get(query);
+      if (res.data && res.data.length > 0) {
+        const historyMsgs = res.data.map(m => ({
+          id: `db-${m.id}`,
+          role: m.role,
+          content: m.content,
+          streaming: false
+        }));
+        setMessages([
+          {
+            id: 'welcome',
+            role: 'assistant',
+            content: `Xin chào! Tôi là **Trợ lý AI Copilot Senior G9**.\n\nĐã tải ${historyMsgs.length} tin nhắn trong lịch sử hội thoại của bạn.`,
+            streaming: false
+          },
+          ...historyMsgs
+        ]);
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải lịch sử chat:", err);
+    }
+  };
+
+  // Phase 2: Tự động tải lịch sử chat từ CSDL khi mở Drawer
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+      fetchHistory();
+    }
+  }, [isOpen, currentProject]);
+
   useEffect(() => {
     if (isOpen) scrollToBottom();
-  }, [messages, isOpen]);
+  }, [messages]);
+
+
+  // Phase 5 & Rule R4: Gửi phản hồi 👍/👎 và cập nhật UI ngay lập tức
+  const handleFeedback = async (msgId, rating) => {
+    setMessages(prev =>
+      prev.map(m => (m.id === msgId ? { ...m, feedbackSubmitted: rating } : m))
+    );
+    try {
+      await api.post('/api/ai/feedback', {
+        feature: 'chat',
+        rating: rating
+      });
+      if (showToast) showToast("Cảm ơn bạn đã gửi phản hồi đánh giá!", "success");
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Handle send message
   const handleSendMessage = async (userPromptText) => {
@@ -277,12 +167,12 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-40 bg-gradient-to-r from-red-600 via-red-500 to-red-700 text-white p-3.5 rounded-full shadow-2xl shadow-red-900/80 hover:scale-110 transition-all border border-red-400 flex items-center gap-2 group"
+          className="fixed bottom-6 right-6 z-40 bg-gradient-to-r from-red-600 via-red-500 to-red-700 text-white p-3.5 rounded-full shadow-xl shadow-red-600/30 hover:scale-110 transition-all border border-red-400 flex items-center gap-2 group"
           title="Mở Trợ Lý AI Chat G9"
         >
           <div className="relative">
             <Bot className="w-6 h-6 text-white" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#09090B]"></span>
+            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white"></span>
           </div>
           <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 font-extrabold text-xs whitespace-nowrap pr-1">
             G9 AI Copilot
@@ -292,21 +182,21 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
 
       {/* Expanded Chat Drawer Container */}
       {isOpen && (
-        <div className="fixed bottom-4 right-4 z-50 w-[92vw] sm:w-[420px] h-[600px] max-h-[88vh] bg-[#09090B] border border-white/15 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-4 right-4 z-50 w-[92vw] sm:w-[420px] h-[600px] max-h-[88vh] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-900 animate-in slide-in-from-bottom duration-300">
           
           {/* Header */}
-          <div className="p-3.5 bg-gradient-to-r from-red-950 via-zinc-900 to-black border-b border-zinc-800 flex items-center justify-between">
+          <div className="p-3.5 bg-gradient-to-r from-red-600 via-red-700 to-slate-900 text-white flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center text-white font-black shadow-lg shadow-red-600/30">
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white font-black shadow-sm">
                 <Bot className="w-5 h-5 text-white" />
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
                   <h3 className="text-xs font-black text-white">G9 AI Copilot Assistant</h3>
-                  <span className="bg-red-600 text-white text-[9px] font-black px-1.5 rounded uppercase">RAG</span>
+                  <span className="bg-white text-red-700 text-[9px] font-black px-1.5 rounded uppercase">RAG</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="text-[10px] text-red-100 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                   Project: {currentProject?.name || 'G9 SaaS'}
                 </span>
               </div>
@@ -315,14 +205,14 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 title="Thu nhỏ"
               >
                 <Minimize2 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 title="Đóng"
               >
                 <X className="w-4 h-4" />
@@ -331,7 +221,7 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
           </div>
 
           {/* Chat Feed */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-[#09090B]">
+          <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50">
             {messages.map((msg) => {
               const isUser = msg.role === 'user';
               return (
@@ -340,26 +230,58 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
                   className={`flex gap-2.5 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
                 >
                   {!isUser && (
-                    <div className="w-7 h-7 rounded-xl bg-red-950 border border-red-800/80 flex items-center justify-center text-red-400 flex-shrink-0 mt-1 shadow-md">
+                    <div className="w-7 h-7 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600 flex-shrink-0 mt-1 shadow-xs">
                       <Bot className="w-4 h-4" />
                     </div>
                   )}
 
-                  <div
-                    className={`max-w-[85%] p-3.5 rounded-2xl text-xs ${
-                      isUser
-                        ? 'bg-gradient-to-r from-red-600 to-red-700 text-white rounded-tr-none shadow-lg shadow-red-950/50'
-                        : 'bg-[#18181B] border border-white/10 text-zinc-200 rounded-tl-none shadow-xl'
-                    }`}
-                  >
-                    {isUser ? (
-                      <p className="whitespace-pre-wrap font-medium">{msg.content}</p>
-                    ) : (
-                      <MarkdownRenderer content={msg.content} />
-                    )}
+                  <div className="flex flex-col space-y-1 max-w-[85%]">
+                    <div
+                      className={`p-3.5 rounded-2xl text-xs ${
+                        isUser
+                          ? 'bg-red-600 text-white rounded-tr-none shadow-md shadow-red-600/20'
+                          : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-xs'
+                      }`}
+                    >
+                      {isUser ? (
+                        <p className="whitespace-pre-wrap font-medium">{msg.content}</p>
+                      ) : (
+                        <MarkdownRenderer content={msg.content} />
+                      )}
 
-                    {msg.streaming && (
-                      <span className="inline-block w-2 h-4 bg-red-500 animate-pulse ml-1 align-middle"></span>
+                      {msg.streaming && (
+                        <span className="inline-block w-2 h-4 bg-red-600 animate-pulse ml-1 align-middle"></span>
+                      )}
+                    </div>
+
+                    {/* Phase 5: Feedback 👍/👎 rating buttons */}
+                    {!isUser && !msg.streaming && msg.id !== 'welcome' && (
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400 pl-1">
+                        <span>Hữu ích?</span>
+                        <button
+                          disabled={!!msg.feedbackSubmitted}
+                          onClick={() => handleFeedback(msg.id, 'up')}
+                          className={`p-1 rounded hover:bg-slate-200 transition-colors ${
+                            msg.feedbackSubmitted === 'up' ? 'text-emerald-600 font-bold bg-emerald-50' : 'text-slate-500'
+                          }`}
+                          title="Hữu ích"
+                        >
+                          <ThumbsUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          disabled={!!msg.feedbackSubmitted}
+                          onClick={() => handleFeedback(msg.id, 'down')}
+                          className={`p-1 rounded hover:bg-slate-200 transition-colors ${
+                            msg.feedbackSubmitted === 'down' ? 'text-rose-600 font-bold bg-rose-50' : 'text-slate-500'
+                          }`}
+                          title="Chưa chính xác"
+                        >
+                          <ThumbsDown className="w-3 h-3" />
+                        </button>
+                        {msg.feedbackSubmitted && (
+                          <span className="text-[9px] text-emerald-600 font-bold">✓ Cảm ơn!</span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -368,15 +290,16 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
             <div ref={messagesEndRef} />
           </div>
 
+
           {/* Quick Prompts */}
-          <div className="px-3 py-2 bg-zinc-900/90 border-t border-zinc-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            <Sparkles className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+          <div className="px-3 py-2 bg-slate-100 border-t border-slate-200 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <Sparkles className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
             {quickPrompts.map((qp, idx) => (
               <button
                 key={idx}
                 disabled={loading}
                 onClick={() => handleSendMessage(qp)}
-                className="px-2.5 py-1 bg-zinc-800 hover:bg-red-950/60 hover:text-red-300 text-zinc-300 text-[10px] font-bold rounded-lg whitespace-nowrap border border-zinc-700/80 transition-all flex-shrink-0"
+                className="px-2.5 py-1 bg-white hover:bg-red-50 hover:text-red-600 text-slate-700 text-[10px] font-bold rounded-lg whitespace-nowrap border border-slate-200 transition-all flex-shrink-0 shadow-xs"
               >
                 {qp}
               </button>
@@ -384,7 +307,7 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
           </div>
 
           {/* Input Box */}
-          <div className="p-3 bg-zinc-950 border-t border-zinc-800">
+          <div className="p-3 bg-white border-t border-slate-200">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -398,12 +321,12 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
                 onChange={(e) => setInputMsg(e.target.value)}
                 placeholder="Hỏi AI Copilot về tiến độ, công việc, cuộc họp..."
                 disabled={loading}
-                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-600 font-medium"
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600 font-medium"
               />
               <button
                 type="submit"
                 disabled={loading || !inputMsg.trim()}
-                className="p-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl shadow-md shadow-red-900/50 transition-all"
+                className="p-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl shadow-md shadow-red-600/20 transition-all"
               >
                 <Send className="w-4 h-4" />
               </button>

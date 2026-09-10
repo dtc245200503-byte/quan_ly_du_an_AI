@@ -71,7 +71,7 @@ export const AssigneeCombobox = ({ users = [], value, onChange, currentProjectId
       {/* Input Display Button */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-zinc-900 border border-zinc-700/80 hover:border-zinc-500 rounded-lg px-3 py-2 text-xs font-medium text-zinc-100 flex items-center justify-between cursor-pointer transition-colors"
+        className="w-full bg-white border border-slate-300 hover:border-slate-400 rounded-lg px-3 py-2 text-xs font-medium text-slate-900 flex items-center justify-between cursor-pointer transition-colors"
       >
         <div className="flex items-center gap-2 truncate">
           {selectedUser ? (
@@ -79,45 +79,45 @@ export const AssigneeCombobox = ({ users = [], value, onChange, currentProjectId
               <img
                 src={selectedUser.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
                 alt={selectedUser.full_name}
-                className="w-5 h-5 rounded-full object-cover border border-zinc-700 flex-shrink-0"
+                className="w-5 h-5 rounded-full object-cover border border-slate-300 flex-shrink-0"
               />
-              <span className="font-semibold text-zinc-100 truncate">{selectedUser.full_name}</span>
+              <span className="font-semibold text-slate-900 truncate">{selectedUser.full_name}</span>
             </>
           ) : (
             <>
-              <User className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-              <span className="text-zinc-500 italic">Chưa phân công</span>
+              <User className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <span className="text-slate-400 italic">Chưa phân công</span>
             </>
           )}
         </div>
-        <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 mt-1.5 bg-[#18181B] border border-white/10 rounded-xl shadow-2xl z-50 p-2 space-y-1 max-h-64 overflow-y-auto">
+        <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 p-2 space-y-1 max-h-64 overflow-y-auto">
           {/* Search Field */}
           <div className="relative mb-2">
-            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2.5" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
             <input
               type="text"
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Gõ tên để tìm hoặc thêm mới..."
-              className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500"
+              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-red-600"
             />
           </div>
 
           {/* Unassigned Option */}
           <div
             onClick={() => handleSelectUser(null)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer hover:bg-zinc-800 transition-colors ${
-              !value ? 'bg-red-950/40 text-red-400 font-bold' : 'text-zinc-400'
+            className={`px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors ${
+              !value ? 'bg-red-50 text-red-700 font-bold' : 'text-slate-500'
             }`}
           >
             <span>Chưa phân công</span>
-            {!value && <Check className="w-3.5 h-3.5 text-red-500" />}
+            {!value && <Check className="w-3.5 h-3.5 text-red-600" />}
           </div>
 
           {/* Filtered Users List */}
@@ -127,22 +127,22 @@ export const AssigneeCombobox = ({ users = [], value, onChange, currentProjectId
               <div
                 key={u.id}
                 onClick={() => handleSelectUser(u)}
-                className={`px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer hover:bg-zinc-800 transition-colors ${
-                  isSelected ? 'bg-red-950/40 text-red-400 font-bold' : 'text-zinc-200'
+                className={`px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors ${
+                  isSelected ? 'bg-red-50 text-red-700 font-bold' : 'text-slate-800'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <img
                     src={u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
                     alt={u.full_name}
-                    className="w-6 h-6 rounded-full object-cover border border-zinc-700 flex-shrink-0"
+                    className="w-6 h-6 rounded-full object-cover border border-slate-300 flex-shrink-0"
                   />
                   <div className="min-w-0">
                     <span className="block truncate font-semibold">{u.full_name}</span>
-                    <span className="block text-[10px] text-zinc-500 truncate">{u.job_title || u.role}</span>
+                    <span className="block text-[10px] text-slate-500 truncate">{u.job_title || u.role}</span>
                   </div>
                 </div>
-                {isSelected && <Check className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
+                {isSelected && <Check className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />}
               </div>
             );
           })}
@@ -151,13 +151,13 @@ export const AssigneeCombobox = ({ users = [], value, onChange, currentProjectId
           {showCreateOption && (
             <div
               onClick={handleQuickAddUser}
-              className="px-2.5 py-2 mt-1 rounded-lg text-xs bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 text-red-400 font-semibold flex items-center justify-between cursor-pointer transition-colors"
+              className="px-2.5 py-2 mt-1 rounded-lg text-xs bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-semibold flex items-center justify-between cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-2 truncate">
                 {addingNew ? (
-                  <Loader2 className="w-4 h-4 text-red-500 animate-spin flex-shrink-0" />
+                  <Loader2 className="w-4 h-4 text-red-600 animate-spin flex-shrink-0" />
                 ) : (
-                  <Plus className="w-4 h-4 text-red-500 flex-shrink-0" />
+                  <Plus className="w-4 h-4 text-red-600 flex-shrink-0" />
                 )}
                 <span className="truncate">Thêm người mới: "{query}"</span>
               </div>

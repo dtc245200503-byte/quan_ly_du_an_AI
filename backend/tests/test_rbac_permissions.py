@@ -1,22 +1,20 @@
 import pytest
+import time
 from fastapi.testclient import TestClient
 from backend.main import app
-from backend.database import Base, engine, SessionLocal
-from backend.models import User, Project, ProjectMember
-from backend.auth import hash_password
+from backend.database import Base, engine
 
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_db():
-    # Setup clean tables for test
     Base.metadata.create_all(bind=engine)
     yield
 
 def test_new_user_blank_state_isolation():
-    # 1. Register a new user
+    ts = int(time.time() * 1000)
     reg_payload = {
-        "identifier": "newuser_rbac@g9.vn",
+        "identifier": f"newuser_rbac_{ts}@g9.vn",
         "password": "Password123!",
         "full_name": "New User Blank State",
         "role": "Member"
@@ -47,13 +45,14 @@ def test_new_user_blank_state_isolation():
     assert res_meetings.json() == []
 
 def test_rbac_project_access_denied():
-    # 1. Register User A and create a project
+    ts = int(time.time() * 1000)
     reg_a = client.post("/api/auth/register", json={
-        "identifier": "usera_rbac@g9.vn",
+        "identifier": f"usera_rbac_{ts}@g9.vn",
         "password": "Password123!",
         "full_name": "User A",
         "role": "Member"
     })
+    assert reg_a.status_code == 200, reg_a.text
     token_a = reg_a.json()["access_token"]
     headers_a = {"Authorization": f"Bearer {token_a}"}
 
@@ -66,11 +65,12 @@ def test_rbac_project_access_denied():
 
     # 2. Register User B
     reg_b = client.post("/api/auth/register", json={
-        "identifier": "userb_rbac@g9.vn",
+        "identifier": f"userb_rbac_{ts}@g9.vn",
         "password": "Password123!",
         "full_name": "User B",
         "role": "Member"
     })
+    assert reg_b.status_code == 200, reg_b.text
     token_b = reg_b.json()["access_token"]
     headers_b = {"Authorization": f"Bearer {token_b}"}
 

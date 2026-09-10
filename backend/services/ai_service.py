@@ -1,8 +1,8 @@
 import json
 import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from backend.models import Project, Task, User, ProjectMember, MeetingNote
+from backend.models import Project, Task, User, ProjectMember, MeetingNote, AIReport, AIFeedback
 
 class AIService:
     def generate_weekly_summary(self, db: Session, project_id: int) -> Dict[str, Any]:
@@ -35,11 +35,33 @@ class AIService:
         priorities.append("Hoàn tất các nhiệm vụ đang ở trạng thái In Progress & Review")
         priorities.append("Họp kiểm tra tiến độ giữa tuần với các thành viên dự án")
 
+        # MANDATORY LOGIC: If completion rate = 0% AND overdue > 0 -> BÁO ĐỘNG
+        if completion_rate == 0.0 and len(overdue) > 0:
+            health_status = "🚨 BÁO ĐỘNG"
+            health_reason = f"Dự án chưa hoàn thành nhiệm vụ nào (0%) và đang có {len(overdue)} nhiệm vụ bị quá hạn!"
+        elif len(overdue) > 0:
+            health_status = "⚠️ CẢNH BÁO"
+            health_reason = f"Có {len(overdue)} nhiệm vụ quá hạn cần xử lý gấp."
+        else:
+            health_status = "✅ TỐT"
+            health_reason = "Tiến độ dự án diễn ra đúng kế hoạch."
+
         summary_text = (
-            f"Báo cáo tiến độ dự án '{project.name}': Dự án hiện có {len(tasks)} nhiệm vụ với tỷ lệ hoàn thành {completion_rate}%. "
-            f"Đã hoàn thành {len(completed)} nhiệm vụ ({done_hours}/{total_hours}h), đang còn {len(pending)} nhiệm vụ tồn đọng. "
-            f"Đánh giá chung: Tiến độ tích cực, các thành viên hoạt động ổn định."
+            f"📊 TÌNH TRẠNG SỨC KHỎE DỰ ÁN\n"
+            f"• Trạng thái: {health_status} - {health_reason}\n"
+            f"• Chỉ số: {len(completed)}/{len(tasks)} tasks ({completion_rate}%) | Số task quá hạn: {len(overdue)} | Tổng giờ: {done_hours}/{total_hours}h"
         )
+
+
+        # Phase 3: Lưu bản ghi báo cáo vào bảng AIReport
+        report = AIReport(
+            project_id=project_id,
+            report_type="Weekly",
+            content=summary_text
+        )
+        db.add(report)
+        db.commit()
+        db.refresh(report)
 
         return {
             "project_id": project.id,
@@ -48,8 +70,13 @@ class AIService:
             "pending_tasks_count": len(pending),
             "overdue_tasks_count": len(overdue),
             "risks": risks,
-            "priorities": priorities
+            "priorities": priorities,
+            "report_id": report.id
         }
+
+    def get_ai_reports(self, db: Session, project_id: int) -> List[AIReport]:
+        """Lấy danh sách các báo cáo AI đã sinh ra của dự án (Phase 3)"""
+        return db.query(AIReport).filter(AIReport.project_id == project_id).order_by(AIReport.generated_at.desc()).all()
 
     def generate_meeting_minutes(self, db: Session, project_id: int, user_id: int, title: str, raw_notes: str) -> Dict[str, Any]:
         project = db.query(Project).filter(Project.id == project_id).first()
@@ -164,5 +191,85 @@ class AIService:
             "suggested_assignee": best_candidate,
             "all_candidates": candidates
         }
+
+    def calculate_risk_scores(self, db: Session, project_id: int) -> Dict[str, Any]:
+        """
+        Phase 4: Thuật toán phân tích tiến độ & tính điểm ai_risk_score (0.0 - 1.0) cho từng Task.
+        So sánh thời gian còn lại đến due_date với estimated_hours và gán điểm rủi ro.
+        """
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            raise ValueError("Không tìm thấy dự án")
+
+        tasks = db.query(Task).filter(Task.project_id == project_id).all()
+        now = datetime.datetime.utcnow()
+
+        high_risk_tasks = []
+
+        for task in tasks:
+            if task.status == "Done":
+                task.ai_risk_score = 0.0
+            elif task.due_date and task.due_date < now:
+                task.ai_risk_score = 1.0 # Task đã quá hạn!
+            elif task.due_date:
+                hours_left = (task.due_date - now).total_seconds() / 3600.0
+                if hours_left <= 0:
+                    task.ai_risk_score = 1.0
+                elif hours_left < task.estimated_hours:
+                    # Thời gian còn lại ít hơn ước tính công việc
+                    task.ai_risk_score = min(0.95, round(0.7 + (task.estimated_hours - hours_left) / (task.estimated_hours + 1.0), 2))
+                elif hours_left <= 48 and task.status == "Todo":
+                    # Còn dưới 2 ngày mà chưa bắt đầu làm
+                    task.ai_risk_score = 0.75
+                else:
+                    ratio = task.estimated_hours / (hours_left + 1.0)
+                    task.ai_risk_score = max(0.1, min(0.65, round(ratio, 2)))
+            else:
+                # Không có due_date nhưng công việc quá lớn mà còn ở Todo
+                if task.estimated_hours >= 20 and task.status == "Todo":
+                    task.ai_risk_score = 0.7
+                else:
+                    task.ai_risk_score = 0.2
+
+            if task.ai_risk_score >= 0.7:
+                high_risk_tasks.append({
+                    "id": task.id,
+                    "title": task.title,
+                    "ai_risk_score": task.ai_risk_score,
+                    "status": task.status,
+                    "due_date": task.due_date
+                })
+
+        db.commit()
+
+        # Tạo bản ghi AIReport loại Risk_Analysis (Phase 3 & Phase 4)
+        report_content = f"Phân tích rủi ro ngày {now.strftime('%Y-%m-%d %H:%M')}: Tìm thấy {len(high_risk_tasks)}/{len(tasks)} nhiệm vụ có nguy cơ trễ hạn (risk score >= 0.7)."
+        ai_report = AIReport(
+            project_id=project_id,
+            report_type="Risk_Analysis",
+            content=report_content
+        )
+        db.add(ai_report)
+        db.commit()
+
+        return {
+            "project_id": project_id,
+            "analyzed_tasks_count": len(tasks),
+            "high_risk_tasks": high_risk_tasks,
+            "message": f"Đã phân tích xong {len(tasks)} nhiệm vụ. Phát hiện {len(high_risk_tasks)} nhiệm vụ có nguy cơ trễ hạn cao."
+        }
+
+    def save_feedback(self, db: Session, user_id: int, feature: str, rating: str, note: Optional[str] = None) -> AIFeedback:
+        """Phase 5: Tiếp nhận phản hồi đánh giá AI 👍/👎"""
+        feedback = AIFeedback(
+            user_id=user_id,
+            feature=feature,
+            rating=rating,
+            note=note
+        )
+        db.add(feedback)
+        db.commit()
+        db.refresh(feedback)
+        return feedback
 
 ai_service = AIService()

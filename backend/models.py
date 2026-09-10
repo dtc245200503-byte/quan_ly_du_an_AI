@@ -104,6 +104,7 @@ class Task(Base):
     reporter_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     due_date = Column(DateTime, nullable=True)
     estimated_hours = Column(Float, default=0.0)
+    ai_risk_score = Column(Float, default=0.0) # Rule R1: auto-patched in database.py
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -177,4 +178,40 @@ class Meeting(Base):
 
     # Relationships
     project = relationship("Project", back_populates="meetings")
+
+
+class ChatMessage(Base):
+    """Bảng lưu lịch sử hội thoại với Trợ lý AI (Phase 2)"""
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role = Column(String, nullable=False) # "user" or "assistant"
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AIReport(Base):
+    """Bảng lưu các báo cáo do AI sinh ra (Phase 3)"""
+    __tablename__ = "ai_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    report_type = Column(String, nullable=False) # "Weekly", "Milestone", "Risk_Analysis"
+    content = Column(Text, nullable=False)
+    generated_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AIFeedback(Base):
+    """Bảng lưu phản hồi đánh giá của người dùng cho AI (Phase 5)"""
+    __tablename__ = "ai_feedbacks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    feature = Column(String, nullable=False) # "chat", "suggest_assignment", "weekly_summary"
+    rating = Column(String, nullable=False) # "up", "down"
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 
