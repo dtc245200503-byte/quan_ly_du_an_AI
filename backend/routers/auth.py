@@ -1,78 +1,67 @@
 import json
 import uuid
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models import User, RevokedToken
 from backend.schemas import (
     UserRegister, UserLogin, TokenResponse, UserResponse,
-    ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest
+    ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest, VerifyOtpRequest
 )
 from backend.auth import hash_password, verify_password, create_access_token, get_current_user, oauth2_scheme
-from backend.services.notification_service import notification_adapter
+from backend.services import auth_challenges as challenges
+import secrets
+from sqlalchemy.exc import IntegrityError
 from jose import jwt
 from backend.config import settings
+from backend.phone import normalize_phone
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 def is_phone_number(val: str) -> bool:
-    clean = val.replace("+", "").replace("-", "").replace(" ", "")
-    return clean.isdigit()
+    try:
+        normalize_phone(val)
+        return True
+    except ValueError:
+        # Keep exact legacy phone identifiers accepted by the previous login code.
+        clean = val.replace("+", "").replace("-", "").replace(" ", "")
+        return clean.isdigit()
 
-@router.post("/register", response_model=TokenResponse)
-def register(req: UserRegister, db: Session = Depends(get_db)):
-    identifier = req.identifier.strip()
-    is_phone = is_phone_number(identifier)
+@router.post("/register")
+def register(req: UserRegister, request: Request, db: Session = Depends(get_db)):
+    return challenges.issue(db, req.email, "register", request.client.host if request.client else "unknown",
+                            {"full_name": req.full_name, "role": req.role or "Member",
+                             "phone_number": req.phone_number,
+                             "password_hash": hash_password(req.password)})
 
-    # Check existing user
-    if is_phone:
-        existing = db.query(User).filter(User.phone_number == identifier).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Số điện thoại này đã được sử dụng")
-        email_val = None
-        phone_val = identifier
-    else:
-        existing = db.query(User).filter(User.email == identifier).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Email này đã được sử dụng")
-        email_val = identifier
-        phone_val = None
 
-    new_user = User(
-        email=email_val,
-        phone_number=phone_val,
-        password_hash=hash_password(req.password),
-        full_name=req.full_name,
-        role=req.role or "Member",
-        skills=json.dumps(["Python", "React", "Project Management"], ensure_ascii=False)
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+@router.post("/register/resend")
+def resend_register(req: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    # Resend reads the same pending payload under the challenge's SQLite lock.
+    return challenges.issue(db, req.identifier, "register", request.client.host if request.client else "unknown", resend=True)
 
-    token = create_access_token({"sub": str(new_user.id)})
-    
-    # Format skills for response
-    skills_list = json.loads(new_user.skills) if new_user.skills else []
-    user_res = UserResponse(
-        id=new_user.id,
-        email=new_user.email,
-        phone_number=new_user.phone_number,
-        full_name=new_user.full_name,
-        role=new_user.role,
-        skills=skills_list,
-        avatar_url=new_user.avatar_url,
-        gender=new_user.gender,
-        date_of_birth=new_user.date_of_birth,
-        address=new_user.address,
-        bio=new_user.bio,
-        job_title=new_user.job_title,
-        created_at=new_user.created_at
-    )
 
-    return TokenResponse(access_token=token, user=user_res)
+@router.post("/register/verify")
+def verify_register(req: VerifyOtpRequest, db: Session = Depends(get_db)):
+    challenges.begin(db)
+    row = challenges.consume(db, req.identifier, "register", req.token_or_otp)
+    if not row.payload or challenges.find_user(db, req.identifier):
+        raise HTTPException(400, "Đăng ký không còn hợp lệ. Vui lòng đăng nhập hoặc đăng ký lại.")
+    data = json.loads(row.payload)
+    if data.get("phone_number") and challenges.find_phone(db, data["phone_number"]):
+        raise HTTPException(400, "Số điện thoại này đã được sử dụng")
+    db.add(User(email=req.identifier, full_name=data["full_name"], role=data["role"],
+                phone_number=data.get("phone_number"),
+                password_hash=data["password_hash"], skills="[]"))
+    row.payload = row.code_hash = row.grant_hash = None
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(400, "Email hoặc số điện thoại này đã được sử dụng") from None
+    return {"message": "Xác minh email và đăng ký thành công. Vui lòng đăng nhập."}
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -81,9 +70,16 @@ def login(req: UserLogin, db: Session = Depends(get_db)):
     is_phone = is_phone_number(identifier)
 
     if is_phone:
+        # Preserve exact legacy identifiers, then match their normalized formatting.
         user = db.query(User).filter(User.phone_number == identifier).first()
+        if not user:
+            try:
+                matches = challenges.phone_matches(db, identifier).limit(2).all()
+                user = matches[0] if len(matches) == 1 else None
+            except ValueError:
+                user = None
     else:
-        user = db.query(User).filter(User.email == identifier).first()
+        user = db.query(User).filter(challenges.func.lower(User.email) == identifier.lower()).first()
 
     if not user:
         raise HTTPException(status_code=401, detail="Email hoặc số điện thoại không tồn tại")
@@ -173,47 +169,34 @@ def change_password(req: ChangePasswordRequest, current_user: User = Depends(get
 
 
 @router.post("/forgot-password")
-def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    identifier = req.identifier.strip()
-    is_phone = is_phone_number(identifier)
+def forgot_password(req: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    return challenges.issue(db, req.identifier, "reset", request.client.host if request.client else "unknown")
 
-    if is_phone:
-        user = db.query(User).filter(User.phone_number == identifier).first()
-    else:
-        user = db.query(User).filter(User.email == identifier).first()
 
-    if not user:
-        raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản với thông tin đã cung cấp")
-
-    # Generate sample 6-digit OTP code
-    otp = "889966"
-    notification_adapter.send_password_reset_notification(identifier, is_phone, otp)
-
-    return {
-        "message": f"Mã OTP khôi phục mật khẩu đã được gửi đến {identifier}",
-        "demo_otp": otp # Provided for demo/testing convenience
-    }
+@router.post("/reset-password/verify")
+def verify_reset(req: VerifyOtpRequest, db: Session = Depends(get_db)):
+    challenges.begin(db)
+    row = challenges.consume(db, req.identifier, "reset", req.token_or_otp)
+    if not challenges.find_user(db, req.identifier):
+        raise HTTPException(400, "Mã không đúng, đã hết hạn hoặc đã được sử dụng.")
+    token = secrets.token_urlsafe(32)
+    row.code_hash = None
+    row.grant_hash = challenges.digest(token)
+    row.expires_at = challenges.now() + datetime.timedelta(seconds=settings.RESET_TTL_SECONDS)
+    db.commit()
+    return {"reset_token": token}
 
 
 @router.post("/reset-password")
 def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
-    identifier = req.identifier.strip()
-    is_phone = is_phone_number(identifier)
-
-    if is_phone:
-        user = db.query(User).filter(User.phone_number == identifier).first()
-    else:
-        user = db.query(User).filter(User.email == identifier).first()
-
+    if req.new_password != req.confirm_password:
+        raise HTTPException(400, "Xác nhận mật khẩu không khớp")
+    challenges.begin(db)
+    row = challenges.consume(db, req.identifier, "reset", req.token_or_otp, grant=True)
+    user = challenges.find_user(db, req.identifier)
     if not user:
-        raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản")
-
-    if req.token_or_otp != "889966" and len(req.token_or_otp) < 4:
-        raise HTTPException(status_code=400, detail="Mã OTP khôi phục không hợp lệ")
-
+        raise HTTPException(400, "Yêu cầu khôi phục không hợp lệ")
     user.password_hash = hash_password(req.new_password)
-    user.failed_login_attempts = 0
-    user.locked_until = None
+    row.payload = row.code_hash = row.grant_hash = None
     db.commit()
-
     return {"message": "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại."}

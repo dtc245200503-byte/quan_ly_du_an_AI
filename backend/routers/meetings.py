@@ -102,8 +102,3 @@ def delete_meeting(meeting_id: int, db: Session = Depends(get_db), current_user:
     db.delete(meeting)
     db.commit()
     return {"message": "Đã xóa cuộc họp thành công"}
-
-
-    db.delete(meeting)
-    db.commit()
-    return {"message": "Đã xóa cuộc họp thành công"}

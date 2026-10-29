@@ -3,6 +3,21 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Floa
 from sqlalchemy.orm import relationship
 from backend.database import Base
 
+class AuthChallenge(Base):
+    __tablename__ = "auth_challenges"
+    key = Column(String, primary_key=True)
+    email = Column(String, nullable=False)
+    purpose = Column(String, nullable=False)
+    code_hash = Column(String, nullable=True)
+    payload = Column(Text, nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    window_start = Column(DateTime, nullable=False)
+    last_sent = Column(DateTime, nullable=False)
+    sends = Column(Integer, default=0, nullable=False)
+    attempts = Column(Integer, default=0, nullable=False)
+    grant_hash = Column(String, nullable=True)
+
+
 class User(Base):
     __tablename__ = "users"
 

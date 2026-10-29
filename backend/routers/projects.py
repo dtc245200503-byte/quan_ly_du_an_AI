@@ -7,7 +7,7 @@ from backend.models import Project, ProjectMember, User
 from backend.schemas import ProjectCreate, ProjectUpdate, ProjectResponse, MemberAdd, MemberResponse
 from backend.auth import get_current_user
 from backend.routers.users import to_user_response
-from backend.permissions import verify_project_access
+from backend.permissions import verify_project_access, verify_project_manage_access
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 
@@ -72,7 +72,7 @@ def get_project(project_id: int, db: Session = Depends(get_db), current_user: Us
 
 @router.put("/{project_id}", response_model=ProjectResponse)
 def update_project(project_id: int, req: ProjectUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    project = verify_project_access(project_id, current_user, db)
+    project = verify_project_manage_access(project_id, current_user, db)
     if req.name is not None:
         project.name = req.name
     if req.description is not None:
@@ -83,14 +83,14 @@ def update_project(project_id: int, req: ProjectUpdate, db: Session = Depends(ge
 
 @router.delete("/{project_id}")
 def delete_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    project = verify_project_access(project_id, current_user, db)
+    project = verify_project_manage_access(project_id, current_user, db)
     db.delete(project)
     db.commit()
     return {"message": "Đã xóa dự án thành công"}
 
 @router.post("/{project_id}/members", response_model=ProjectResponse)
 def add_project_member(project_id: int, req: MemberAdd, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    project = verify_project_access(project_id, current_user, db)
+    project = verify_project_manage_access(project_id, current_user, db)
     
     existing = db.query(ProjectMember).filter(ProjectMember.project_id == project_id, ProjectMember.user_id == req.user_id).first()
     if existing:
@@ -104,8 +104,11 @@ def add_project_member(project_id: int, req: MemberAdd, db: Session = Depends(ge
 
 @router.delete("/{project_id}/members/{user_id}", response_model=ProjectResponse)
 def remove_project_member(project_id: int, user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    project = verify_project_access(project_id, current_user, db)
-    
+    project = verify_project_manage_access(project_id, current_user, db)
+
+    if user_id == project.owner_id:
+        raise HTTPException(status_code=400, detail="Không thể xóa chủ dự án (owner) khỏi dự án")
+
     member = db.query(ProjectMember).filter(ProjectMember.project_id == project_id, ProjectMember.user_id == user_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Thành viên không nằm trong dự án")

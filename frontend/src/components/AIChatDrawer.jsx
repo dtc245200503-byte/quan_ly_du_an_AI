@@ -114,17 +114,19 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
         .filter(m => m.id !== 'welcome')
         .map(m => ({ role: m.role, content: m.content }));
 
+      // Gửi yêu cầu tới API Gemini Backend
       const res = await api.post('/api/ai-chat/chat', {
         project_id: currentProject ? currentProject.id : null,
         message: text.trim(),
         history: historyPayload
-      });
+   });
 
       const fullReply = res.data.reply || "Không nhận được phản hồi từ AI.";
+      const replySource = res.data.source; // "llm" hoặc "rule_based"
 
       // Typing streaming effect simulation
       const botMsgId = `bot-${Date.now()}`;
-      setMessages(prev => [...prev, { id: botMsgId, role: 'assistant', content: '', streaming: true }]);
+      setMessages(prev => [...prev, { id: botMsgId, role: 'assistant', content: '', streaming: true, source: replySource }]);
 
       let currentText = '';
       const chunkSize = 6;
@@ -153,7 +155,7 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
         {
           id: `bot-err-${Date.now()}`,
           role: 'assistant',
-          content: "❌ **Đã xảy ra lỗi khi kết nối với Trợ lý AI G9.** Vui lòng thử lại sau.",
+          content: "❌ **Đã xảy ra lỗi khi kết nối với Trợ lý AI G9.** Vui lòng kiểm tra lại backend hoặc API Key.",
           streaming: false
         }
       ]);
@@ -253,6 +255,13 @@ export const AIChatDrawer = ({ currentProject, showToast }) => {
                         <span className="inline-block w-2 h-4 bg-red-600 animate-pulse ml-1 align-middle"></span>
                       )}
                     </div>
+
+                    {/* Cảnh báo khi câu trả lời đến từ chế độ dự phòng rule-based */}
+                    {!isUser && !msg.streaming && msg.source === 'rule_based' && (
+                      <div className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 pl-1 font-semibold">
+                        ⚠️ Đang trả lời bằng mẫu dự phòng (chưa cấu hình GEMINI_API_KEY hoặc AI đang lỗi) — không phải AI thật.
+                      </div>
+                    )}
 
                     {/* Phase 5: Feedback 👍/👎 rating buttons */}
                     {!isUser && !msg.streaming && msg.id !== 'welcome' && (

@@ -139,22 +139,14 @@ def update_task(task_id: int, req: TaskUpdate, db: Session = Depends(get_db), cu
 
     verify_project_access(task.project_id, current_user, db)
 
-    if req.title is not None:
-        task.title = req.title
-    if req.description is not None:
-        task.description = req.description
-    if req.status is not None:
-        task.status = req.status
-    if req.priority is not None:
-        task.priority = req.priority
-    if req.assignee_id is not None:
-        task.assignee_id = req.assignee_id
-    if req.sprint_id is not None:
-        task.sprint_id = req.sprint_id
-    if req.due_date is not None:
-        task.due_date = req.due_date
-    if req.estimated_hours is not None:
-        task.estimated_hours = req.estimated_hours
+    # Chỉ áp dụng các field THỰC SỰ được client gửi lên (exclude_unset=True).
+    # Nhờ đó phân biệt được giữa "field không được gửi" (giữ nguyên giá trị cũ)
+    # và "field được gửi là null" (xóa/bỏ gán giá trị, ví dụ bỏ chọn assignee/sprint/due_date).
+    # Trước đây dùng "if req.x is not None" nên KHÔNG THỂ bỏ gán assignee/sprint/due_date
+    # vì client gửi null nhưng bị bỏ qua.
+    update_data = req.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(task, field, value)
 
     db.commit()
     db.refresh(task)

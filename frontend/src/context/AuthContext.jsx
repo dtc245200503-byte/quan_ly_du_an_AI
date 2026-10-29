@@ -38,12 +38,9 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const register = async (identifier, password, full_name, role = "Member") => {
-    const res = await api.post('/api/auth/register', { identifier, password, full_name, role });
-    const { access_token, user: userData } = res.data;
-    localStorage.setItem('g9_access_token', access_token);
-    setUser(userData);
-    return userData;
+  const register = async (identifier, password, full_name, role = "Member", email) => {
+    const res = await api.post('/api/auth/register', { identifier, password, full_name, role, ...(email ? { email } : {}) });
+    return res.data;
   };
 
   const logout = async () => {

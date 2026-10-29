@@ -6,8 +6,11 @@ import api from '../api';
 export const AuthView = ({ showToast }) => {
   const { login, register } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
-  const [identifier, setIdentifier] = useState('admin@g9.vn');
-  const [password, setPassword] = useState('admin123');
+  const [registrationMethod, setRegistrationMethod] = useState('email');
+  const [deliveryEmail, setDeliveryEmail] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('Member');
   const [loading, setLoading] = useState(false);
@@ -16,7 +19,21 @@ export const AuthView = ({ showToast }) => {
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotIdentifier, setForgotIdentifier] = useState('');
   const [forgotStep, setForgotStep] = useState(1);
-  const [demoOtp, setDemoOtp] = useState('');
+  const [registerOtp, setRegisterOtp] = useState('');
+  const [registerPending, setRegisterPending] = useState(false);
+  const [registerWait, setRegisterWait] = useState(0);
+  const [forgotWait, setForgotWait] = useState(0);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const errorMessage = (err) => typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'Không thể kết nối. Vui lòng kiểm tra thông tin và thử lại.';
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRegisterWait(v => Math.max(0, v - 1));
+      setForgotWait(v => Math.max(0, v - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [otpInput, setOtpInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
 
@@ -78,8 +95,8 @@ export const AuthView = ({ showToast }) => {
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
             const alpha = (1 - dist / 140) * 0.2;
-            ctx.strokeStyle = nodes[i].color === '#DC2626' 
-              ? `rgba(220, 38, 38, ${alpha})` 
+            ctx.strokeStyle = nodes[i].color === '#DC2626'
+              ? `rgba(220, 38, 38, ${alpha})`
               : `rgba(37, 99, 235, ${alpha})`;
             ctx.lineWidth = 0.8;
             ctx.stroke();
@@ -127,51 +144,68 @@ export const AuthView = ({ showToast }) => {
           setLoading(false);
           return;
         }
-        await register(identifier, password, fullName, role);
-        showToast("Đăng ký tài khoản thành công!", "success");
+        if (registerPending) {
+          const res = await api.post('/api/auth/register/verify', { identifier: pendingEmail, token_or_otp: registerOtp });
+          setRegisterPending(false); setRegisterOtp(''); setIsRegister(false); setPassword('');
+          showToast(res.data.message, 'success');
+        } else {
+          if (registrationMethod === 'phone' && !isPhone(identifier)) {
+            showToast('Vui lòng nhập số điện thoại đăng nhập hợp lệ', 'error');
+            return;
+          }
+          const res = await register(identifier, password, fullName, role,
+            registrationMethod === 'phone' ? deliveryEmail : undefined);
+          setPendingEmail(res.registration_email);
+          setRegisterPending(true); setRegisterWait(res.resend_after); setPassword('');
+          showToast(res.message, 'success');
+        }
       } else {
         await login(identifier, password);
         showToast("Đăng nhập thành công!", "success");
       }
     } catch (err) {
-      showToast(err.response?.data?.detail || "Đã xảy ra lỗi xác thực", "error");
+      showToast(errorMessage(err), "error");
     } finally {
       setLoading(false);
     }
   };
 
+  const resendRegistration = async () => {
+    setLoading(true);
+    try {
+      const res = await api.post('/api/auth/register/resend', { identifier: pendingEmail });
+      setRegisterWait(res.data.resend_after); showToast(res.data.message, 'success');
+    } catch (err) { showToast(errorMessage(err), 'error'); }
+    finally { setLoading(false); }
+  };
+
   const handleSendOtp = async (e) => {
-    e.preventDefault();
-    if (!forgotIdentifier.trim()) {
-      showToast("Vui lòng nhập Email hoặc SĐT", "error");
-      return;
-    }
+    e.preventDefault(); setLoading(true);
     try {
       const res = await api.post('/api/auth/forgot-password', { identifier: forgotIdentifier });
-      setDemoOtp(res.data.demo_otp || "889966");
-      setForgotStep(2);
-      showToast(res.data.message, "info");
-    } catch (err) {
-      showToast(err.response?.data?.detail || "Không thể gửi mã khôi phục", "error");
-    }
+      setForgotStep(2); setForgotWait(res.data.resend_after); setOtpInput(''); setResetToken('');
+      showToast(res.data.message, 'info');
+    } catch (err) { showToast(errorMessage(err), 'error'); }
+    finally { setLoading(false); }
   };
 
   const handleResetPassword = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); setLoading(true);
     try {
-      const res = await api.post('/api/auth/reset-password', {
-        identifier: forgotIdentifier,
-        token_or_otp: otpInput,
-        new_password: newPasswordInput
-      });
-      showToast(res.data.message, "success");
-      setShowForgotModal(false);
-      setForgotStep(1);
-      setIdentifier(forgotIdentifier);
-      setPassword(newPasswordInput);
-    } catch (err) {
-      showToast(err.response?.data?.detail || "Không thể đặt lại mật khẩu", "error");
-    }
+      if (forgotStep === 2) {
+        const res = await api.post('/api/auth/reset-password/verify', { identifier: forgotIdentifier, token_or_otp: otpInput });
+        setResetToken(res.data.reset_token); setOtpInput(''); setForgotStep(3);
+      } else {
+        if (newPasswordInput !== confirmPassword) { showToast('Xác nhận mật khẩu không khớp', 'error'); return; }
+        const res = await api.post('/api/auth/reset-password', {
+          identifier: forgotIdentifier, token_or_otp: resetToken,
+          new_password: newPasswordInput, confirm_password: confirmPassword
+        });
+        showToast(res.data.message, 'success'); setShowForgotModal(false); setForgotStep(1);
+        setIdentifier(forgotIdentifier); setPassword(''); setNewPasswordInput(''); setConfirmPassword(''); setResetToken('');
+      }
+    } catch (err) { showToast(errorMessage(err), 'error'); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -181,7 +215,7 @@ export const AuthView = ({ showToast }) => {
 
       {/* Main Login Card Container - Light Corporate Glass Style */}
       <div className="relative z-10 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden max-w-4xl w-full grid grid-cols-1 md:grid-cols-2">
-        
+
         {/* Left Banner: Technology Dynamic Illustration */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-8 text-white flex flex-col justify-between relative overflow-hidden border-b md:border-b-0 md:border-r border-slate-800">
           {/* Subtle Red & Blue Ambient Glow */}
@@ -217,7 +251,7 @@ export const AuthView = ({ showToast }) => {
             <div className="relative w-44 h-44 flex items-center justify-center">
               {/* Outer Orbit Ring 1 */}
               <div className="absolute inset-0 border-2 border-dashed border-red-500/40 rounded-full animate-[spin_12s_linear_infinite]" />
-              
+
               {/* Middle Orbit Ring 2 */}
               <div className="absolute inset-3 border border-blue-500/50 rounded-full animate-[spin_8s_linear_infinite_reverse]" />
 
@@ -263,7 +297,7 @@ export const AuthView = ({ showToast }) => {
               {isRegister ? 'Tạo Tài Khoản Mới' : 'Đăng Nhập System'}
             </h2>
             <button
-              onClick={() => setIsRegister(!isRegister)}
+              disabled={loading} onClick={() => { setIsRegister(!isRegister); setRegisterPending(false); setPassword(''); setRegisterOtp(''); }}
               className="text-xs text-red-600 font-bold hover:underline"
             >
               {isRegister ? 'Đã có tài khoản? Đăng nhập' : 'Tạo tài khoản mới'}
@@ -271,7 +305,24 @@ export const AuthView = ({ showToast }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isRegister && (
+            {registerPending && <div className="space-y-3 text-xs text-slate-700" aria-live="polite">
+              <p className="break-words">Nhập mã OTP 6 số đã gửi đến {pendingEmail}. Mã có thời hạn; kiểm tra cả thư rác.</p>
+              <input aria-label="Mã OTP đăng ký" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={registerOtp} onChange={e => setRegisterOtp(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-center tracking-widest focus:ring-2 focus:ring-red-600" />
+              <button type="button" disabled={loading || registerWait > 0} onClick={resendRegistration} className="text-red-600 font-bold disabled:opacity-50">{registerWait ? `Gửi lại sau ${registerWait}s` : 'Gửi lại mã'}</button>
+              <button type="button" disabled={loading} onClick={() => { setRegisterPending(false); setRegisterOtp(''); }} className="ml-3 text-slate-500">Nhập lại thông tin</button>
+            </div>}
+            {isRegister && !registerPending && (
+              <div>
+                <label htmlFor="registration-method" className="block text-xs font-bold text-slate-700 mb-1">Đăng ký bằng</label>
+                <select id="registration-method" value={registrationMethod} disabled={loading}
+                  onChange={e => { setRegistrationMethod(e.target.value); setIdentifier(''); setDeliveryEmail(''); }}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600">
+                  <option value="email">Email</option>
+                  <option value="phone">Số điện thoại (xác minh qua email)</option>
+                </select>
+              </div>
+            )}
+            {isRegister && !registerPending && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Họ và tên</label>
                 <div className="relative">
@@ -288,9 +339,9 @@ export const AuthView = ({ showToast }) => {
               </div>
             )}
 
-            <div>
+            <div hidden={registerPending}>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold text-slate-700">Email hoặc Số điện thoại</label>
+                <label className="block text-xs font-bold text-slate-700">{isRegister ? (registrationMethod === 'phone' ? 'Số điện thoại đăng nhập' : 'Email đăng nhập và nhận OTP') : 'Email hoặc Số điện thoại'}</label>
                 {identifier && (
                   <span className="text-[10px] text-red-600 font-bold uppercase bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
                     {isPhone(identifier) ? 'SĐT' : 'Email'}
@@ -304,24 +355,34 @@ export const AuthView = ({ showToast }) => {
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 )}
                 <input
-                  type="text"
-                  required
+                  type={isRegister ? (registrationMethod === 'phone' ? 'tel' : 'email') : 'text'}
+                  disabled={registerPending || loading}
+                  required={!registerPending}
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="admin@g9.vn hoặc 0988888888"
+                  placeholder={isRegister ? (registrationMethod === 'phone' ? 'Ví dụ: 0912345678' : 'Nhập email đăng ký') : 'admin@g9.vn hoặc 0988888888'}
                   className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all"
                 />
               </div>
             </div>
 
-            <div>
+            {isRegister && !registerPending && registrationMethod === 'phone' && (
+              <div>
+                <label htmlFor="registration-email" className="block text-xs font-bold text-slate-700 mb-1">Email nhận mã OTP</label>
+                <input id="registration-email" type="email" required disabled={loading} value={deliveryEmail}
+                  onChange={e => setDeliveryEmail(e.target.value)} placeholder="Nhập email để xác minh tài khoản"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600" />
+                <p className="text-[11px] text-slate-500 mt-1">OTP và mã khôi phục được gửi qua email này. Sau xác minh, bạn có thể đăng nhập bằng số điện thoại hoặc email.</p>
+              </div>
+            )}
+            <div hidden={registerPending}>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-bold text-slate-700">Mật khẩu</label>
                 {!isRegister && (
                   <button
                     type="button"
                     onClick={() => {
-                      setForgotIdentifier(identifier);
+                      setForgotIdentifier(isPhone(identifier) ? '' : identifier); setForgotStep(1); setOtpInput(''); setResetToken(''); setNewPasswordInput(''); setConfirmPassword('');
                       setShowForgotModal(true);
                     }}
                     className="text-[11px] text-slate-500 hover:text-red-600 font-medium transition-colors"
@@ -333,17 +394,20 @@ export const AuthView = ({ showToast }) => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
-                  type="password"
-                  required
+                  type={showPassword ? "text" : "password"}
+                  disabled={registerPending || loading}
+                  minLength={isRegister ? 8 : undefined}
+                  required={!registerPending}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="••••••••" autoComplete={isRegister ? "new-password" : "current-password"}
                   className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all"
                 />
               </div>
             </div>
 
-            {isRegister && (
+            {!registerPending && <button type="button" onClick={() => setShowPassword(v => !v)} className="text-xs text-slate-500">{showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}</button>}
+            {isRegister && !registerPending && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Vai trò</label>
                 <select
@@ -353,7 +417,6 @@ export const AuthView = ({ showToast }) => {
                 >
                   <option value="Member">Thành viên (Member)</option>
                   <option value="PM">Quản lý dự án (PM)</option>
-                  <option value="Admin">Quản trị viên (Admin)</option>
                 </select>
               </div>
             )}
@@ -367,44 +430,38 @@ export const AuthView = ({ showToast }) => {
                 <span>Đang xử lý...</span>
               ) : (
                 <>
-                  <span>{isRegister ? 'Tạo Tài Khoản G9' : 'Đăng Nhập Ngay'}</span>
+                  <span>{isRegister ? (registerPending ? 'Xác minh và hoàn tất đăng ký' : 'Gửi mã xác minh email') : 'Đăng Nhập Ngay'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick Demo Test Buttons */}
-          {!isRegister && (
-            <div className="mt-6 pt-4 border-t border-slate-200">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">
-                Đăng nhập nhanh (Quick Demo)
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setIdentifier('admin@g9.vn'); setPassword('admin123'); }}
-                  className="py-1.5 px-2 bg-slate-50 hover:bg-red-600 hover:text-white border border-slate-300 rounded text-[11px] font-bold text-slate-700 transition-colors"
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIdentifier('pm@g9.vn'); setPassword('pm123'); }}
-                  className="py-1.5 px-2 bg-slate-50 hover:bg-red-600 hover:text-white border border-slate-300 rounded text-[11px] font-bold text-slate-700 transition-colors"
-                >
-                  PM Lead
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIdentifier('dev1@g9.vn'); setPassword('dev123'); }}
-                  className="py-1.5 px-2 bg-slate-50 hover:bg-red-600 hover:text-white border border-slate-300 rounded text-[11px] font-bold text-slate-700 transition-colors"
-                >
-                  Dev Member
-                </button>
+          {import.meta.env.DEV && !isRegister && (
+            <section aria-label="Tài khoản demo — Đăng nhập nhanh" className="mt-6 pt-4 border-t border-slate-200">
+              <h3 className="text-xs font-bold text-slate-700 mb-2">Tài khoản demo — Đăng nhập nhanh</h3>
+              <p className="text-[11px] text-slate-500 mb-3">Chọn tài khoản để điền thông tin, sau đó nhấn Đăng Nhập Ngay.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { email: 'admin@g9.vn', role: 'Admin' },
+                  { email: 'pm@g9.vn', role: 'PM' },
+                  { email: 'dev1@g9.vn', role: 'Member' },
+                ].map(account => (
+                  <button
+                    key={account.email}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => { setIdentifier(account.email); setPassword('123456'); }}
+                    className="min-w-0 px-2 py-2 bg-slate-50 hover:bg-red-50 border border-slate-300 hover:border-red-300 rounded-lg text-slate-700 transition-colors disabled:opacity-50"
+                  >
+                    <span className="block text-xs font-bold">{account.role}</span>
+                    <span className="block text-[10px] break-all mt-1">{account.email}</span>
+                  </button>
+                ))}
               </div>
-            </div>
+            </section>
           )}
+
         </div>
       </div>
 
@@ -417,21 +474,21 @@ export const AuthView = ({ showToast }) => {
               Khôi Phục Mật Khẩu
             </h3>
             <p className="text-xs text-slate-500">
-              {forgotStep === 1 
-                ? 'Nhập Email hoặc Số điện thoại để nhận mã xác minh OTP đặt lại mật khẩu.' 
-                : `Nhập mã OTP đã được gửi đến ${forgotIdentifier}.`}
+              {forgotStep === 1
+                ? 'Nhập email để nhận mã xác minh OTP đặt lại mật khẩu.'
+                : forgotStep === 2 ? 'Nếu email đã đăng ký, mã OTP sẽ được gửi đến hộp thư. Kiểm tra cả thư rác.' : 'Email đã được xác minh. Nhập mật khẩu mới.'}
             </p>
 
             {forgotStep === 1 ? (
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Email / SĐT</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Email</label>
                   <input
-                    type="text"
+                    type="email"
                     required
                     value={forgotIdentifier}
                     onChange={(e) => setForgotIdentifier(e.target.value)}
-                    placeholder="Nhập email hoặc số điện thoại..."
+                    placeholder="Nhập email..."
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                   />
                 </div>
@@ -441,58 +498,62 @@ export const AuthView = ({ showToast }) => {
                     onClick={() => setShowForgotModal(false)}
                     className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
                   >
-                    Hủy
+                    Quay lại đăng nhập
                   </button>
                   <button
                     type="submit"
+                    disabled={loading}
                     className="px-4 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-md shadow-red-600/20"
                   >
-                    Gửi Mã OTP
+                    {loading ? 'Đang gửi...' : 'Gửi Mã OTP'}
                   </button>
                 </div>
               </form>
             ) : (
               <form onSubmit={handleResetPassword} className="space-y-4">
-                {demoOtp && (
-                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 font-mono">
-                    💡 Mã OTP demo của bạn: <strong className="text-amber-900 font-bold">{demoOtp}</strong>
-                  </div>
-                )}
-                <div>
+                {forgotStep === 2 && <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Mã OTP xác thực</label>
                   <input
                     type="text"
                     required
                     value={otpInput}
                     onChange={(e) => setOtpInput(e.target.value)}
-                    placeholder="889966"
+                    placeholder="Nhập 6 chữ số" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold tracking-widest text-center text-slate-900 focus:ring-2 focus:ring-red-600"
                   />
-                </div>
-                <div>
+                </div>}
+                {forgotStep === 3 && <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Mật khẩu mới</label>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
+                    minLength={8}
                     required
                     value={newPasswordInput}
                     onChange={(e) => setNewPasswordInput(e.target.value)}
                     placeholder="Nhập mật khẩu mới..."
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-red-600"
                   />
-                </div>
+                </div>}
+                {forgotStep === 3 && <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700">Xác nhận mật khẩu mới</label>
+                  <input aria-label="Xác nhận mật khẩu mới" type={showPassword ? 'text' : 'password'} required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-red-600" />
+                  <button type="button" className="text-xs text-slate-500" onClick={() => setShowPassword(v => !v)}>{showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}</button>
+                </div>}
+                {forgotStep === 2 && <button type="button" disabled={loading || forgotWait > 0} onClick={handleSendOtp} className="text-xs text-red-600 disabled:opacity-50">{forgotWait ? `Gửi lại sau ${forgotWait}s` : 'Gửi lại mã'}</button>}
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setForgotStep(1)}
+                    onClick={() => { setShowForgotModal(false); setResetToken(''); setNewPasswordInput(''); setConfirmPassword(''); }}
                     className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
                   >
-                    Quay lại
+                    Quay lại đăng nhập
                   </button>
                   <button
                     type="submit"
+                    disabled={loading}
                     className="px-4 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-md shadow-red-600/20"
                   >
-                    Xác Nhận Đổi Mật Khẩu
+                    {loading ? 'Đang xử lý...' : forgotStep === 2 ? 'Xác minh OTP' : 'Xác Nhận Đổi Mật Khẩu'}
                   </button>
                 </div>
               </form>
